@@ -12,14 +12,15 @@ const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json')));
 function extractBatteryState(data) {
   // Create a dictionary to map module IDs to battery states
   const modules = {};
-  data.meta.homestatus.body.home.modules.forEach((module) => {
-  
-  
-    
-     if (module.battery_state) {
-      modules[module.id] = module;
-     /*   
-      
+
+  // Safe access to homestatus modules
+  const homeStatusBody = data?.meta?.homestatus?.body?.home;
+  if (homeStatusBody && Array.isArray(homeStatusBody.modules)) {
+    homeStatusBody.modules.forEach((module) => {
+      if (module.battery_state) {
+        modules[module.id] = module;
+        /*   
+        
         id: '04:00:00:6d:61:08',
         type: 'NATherm1',
         battery_state: 'very_low',
@@ -27,188 +28,54 @@ function extractBatteryState(data) {
         reachable: false, 
         
       */
-    } 
-  });
+      }
+    });
+  }
 
-//  console.log(modules); 
+  // Safe access to homesdata rooms
+  const homesDataBody = data?.meta?.homesdata?.body?.homes;
+  // Check if homes array exists and has at least one element
+  const homesRooms = (homesDataBody && homesDataBody.length > 0) ? homesDataBody[0].rooms : null;
 
-
-  data.meta.homesdata.body.homes[0].rooms.forEach((room) => {
-
-    
-    room.module_ids.forEach((module_id) => {
-      
-
-      
-      if (modules[module_id]) {
-
-
-        room.battery_state = modules[module_id].battery_state;
-        room.battery_level = modules[module_id].battery_level;
-        room.firmware_revision = modules[module_id].firmware_revision;
-        room.rf_strength = modules[module_id].rf_strength;
-        room.reachable = modules[module_id].reachable;
-        // room.boiler_valve_comfort_boost = modules[module_id].boiler_valve_comfort_boost;
-        // room.bridge = modules[module_id].bridge;
-        // room.boiler_status = modules[module_id].boiler_status;
-
-        /* console.log(modules[module_id]); */
-
-
-        // room: 
-        // {
-        //   id: '1812451076',
-        //   name: 'Łazienka',
-        //   type: 'bathroom',
-        //   module_ids: [ '70:ee:50:0b:df:dc', '04:00:00:0b:df:42' ],
-        //   battery_state: 'full',
-        //   battery_level: 4165,
-        //   firmware_revision: 79,
-        //   rf_strength: 71,
-        //   reachable: true
-        // }
-        // modules[module_id]: 
-        // {
-        //   id: '04:00:00:0b:df:42',
-        //   type: 'NATherm1',
-        //   battery_state: 'full',
-        //   battery_level: 4165,
-        //   firmware_revision: 79,
-        //   rf_strength: 71,
-        //   reachable: true,
-        //   boiler_valve_comfort_boost: false,
-        //   bridge: '70:ee:50:0b:df:dc',
-        //   boiler_status: true
-        // }
-
-    /*    console.log("room: ");
-       console.log(room);
-       console.log("modules[module_id]: ");
-       console.log(modules[module_id]); */
-
-
-       // sprawdz czy w room[module_ids] ktoras wartosc jest rowna modules[module_id].id
-        // jesli tak to dodaj do room wartosci z modules[module_id] 
-
-        if(room.module_ids.includes(modules[module_id].id)) {
-          // console.log("jest");
-
-
-          room.battery_state = modules[module_id].battery_state;
-          room.battery_level = modules[module_id].battery_level;
-          room.rf_strength = modules[module_id].rf_strength;
-          room.reachable = modules[module_id].reachable;
-          
-          data.rooms.forEach((roomO) => {
-           
-            if(roomO.id === room.id) {
-              roomO.battery_state = modules[module_id].battery_state;
-              roomO.battery_level = modules[module_id].battery_level;
-              roomO.rf_strength = modules[module_id].rf_strength;
-              roomO.reachable = modules[module_id].reachable;
+  if (homesRooms && Array.isArray(homesRooms)) {
+    homesRooms.forEach((room) => {
+      if (room.module_ids && Array.isArray(room.module_ids)) {
+        room.module_ids.forEach((module_id) => {
+          if (modules[module_id]) {
+            // room.battery_state = modules[module_id].battery_state;
+            // ... (local update commented out in original, keeping logic clean)
+            
+            // Update combined rooms in data.rooms
+            if (data.rooms && Array.isArray(data.rooms)) {
+              data.rooms.forEach((roomO) => {
+                if (roomO.id === room.id) {
+                  roomO.battery_state = modules[module_id].battery_state;
+                  roomO.battery_level = modules[module_id].battery_level;
+                  roomO.rf_strength = modules[module_id].rf_strength;
+                  roomO.reachable = modules[module_id].reachable;
+                  roomO.firmware_revision = modules[module_id].firmware_revision;
+                }
+              });
             }
-
           }
-
-        )
-
-
+        });
+      } else {
+        // If room has no module_ids or it's not an array
+        if (data.rooms && Array.isArray(data.rooms)) {
+           data.rooms.forEach((roomO) => {
+                if (roomO.id === room.id) {
+                  roomO.warning = "No module_ids found for this room";
+                }
+           });
         }
-     
-      
       }
-
-
-    }); 
-
-
-    /* 
-    
-    modules
-    {
-      '04:00:00:0b:df:42': {
-        id: '04:00:00:0b:df:42',
-        type: 'NATherm1',
-        battery_state: 'full',
-        battery_level: 4269,
-        firmware_revision: 79,
-        rf_strength: 73,
-        reachable: true,
-        boiler_valve_comfort_boost: false,
-        bridge: '70:ee:50:0b:df:dc',
-        boiler_status: false
-      },
-      '04:00:00:10:14:ec': {
-        id: '04:00:00:10:14:ec',
-        type: 'NATherm1',
-        battery_state: 'high',
-        battery_level: 3879,
-        firmware_revision: 79,
-        rf_strength: 78,
-        reachable: true,
-        boiler_valve_comfort_boost: false,
-        bridge: '70:ee:50:86:e1:fa',
-        boiler_status: false
-      },
-      '04:00:00:6d:61:08': {
-        id: '04:00:00:6d:61:08',
-        type: 'NATherm1',
-        battery_state: 'very_low',
-        battery_level: 2551,
-        reachable: false,
-        bridge: '70:ee:50:10:2b:4a'
-      },
-      '04:00:00:11:a5:50': {
-        id: '04:00:00:11:a5:50',
-        type: 'NATherm1',
-        battery_state: 'high',
-        battery_level: 3787,
-        firmware_revision: 79,
-        rf_strength: 39,
-        reachable: true,
-        boiler_valve_comfort_boost: false,
-        bridge: '70:ee:50:11:aa:38',
-        boiler_status: false
-      }
+    });
+  } else {
+    // If homesdata rooms are missing, mark error in output
+    if (data.rooms && Array.isArray(data.rooms)) {
+       data.rooms.forEach(r => r.error_config = "Missing homesdata configuration");
     }
-    
-    rooms
-    
-    {
-      id: '1868270675',
-      name: 'AE Sypialnia',
-      type: 'bedroom',
-      module_ids: [ '04:00:00:6d:61:08' ]
-    }
-    {
-      id: '38038562',
-      name: 'Waleria',
-      type: 'custom',
-      module_ids: [ '70:ee:50:11:aa:38', '04:00:00:11:a5:50' ]
-    }
-    {
-      id: '3398980513',
-      name: 'Łazienka na piętrze',
-      type: 'bathroom',
-      module_ids: [ '70:ee:50:10:2b:4a' ]
-    }
-    {
-      id: '206653929',
-      name: 'Kuchnia',
-      type: 'kitchen',
-      module_ids: [ '70:ee:50:86:e1:fa', '04:00:00:10:14:ec' ]
-    }
-    {
-      id: '1812451076',
-      name: 'Łazienka',
-      type: 'bathroom',
-      module_ids: [ '70:ee:50:0b:df:dc', '04:00:00:0b:df:42' ]
-    } */
-
-
-
-
-  });
+  }
 
   // Create a dictionary to map module IDs to room IDs
  /*  const module_to_room = {};
@@ -245,7 +112,7 @@ function extractBatteryState(data) {
 
 
 function filterHomestatusData(data) {
-  if (!data.body.home.rooms) {
+  if (!data || !data.body || !data.body.home || !data.body.home.rooms) {
     return [];
   }
 
@@ -262,7 +129,7 @@ function filterHomestatusData(data) {
 }
 
 function filterHomesdata(data) {
-  if (!data.body.homes[0].rooms) {
+  if (!data || !data.body || !data.body.homes || data.body.homes.length === 0 || !data.body.homes[0].rooms) {
     return [];
   }
 
@@ -274,8 +141,19 @@ function filterHomesdata(data) {
 }
 
 function combineRoomData(homestatusRooms, homesdataRooms) {
-  return homestatusRooms.map(statusRoom => {
-    const dataRoom = homesdataRooms.find(room => room.id === statusRoom.id);
+  const statusRooms = Array.isArray(homestatusRooms) ? homestatusRooms : [];
+  const configRooms = Array.isArray(homesdataRooms) ? homesdataRooms : [];
+
+  // If status is missing but config exists, return config with error
+  if (statusRooms.length === 0 && configRooms.length > 0) {
+    return configRooms.map(room => ({
+      ...room,
+      error: "Missing homestatus data from Netatmo"
+    }));
+  }
+
+  return statusRooms.map(statusRoom => {
+    const dataRoom = configRooms.find(room => room.id === statusRoom.id) || { warning: "Missing room config" };
     return { ...statusRoom, ...dataRoom };
   });
 }

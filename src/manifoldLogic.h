@@ -25,26 +25,27 @@ void manifoldLogicNew()
 {
     Serial.println("--- Start Heating Logic ---");
 
-    // przerwij funkcje jesli nie ma temepratury lub jest za niska
-    if (isnan(manifoldTemp)) {
-         Serial.println("Manifold temperature sensor data is invalid (NaN). Aborting logic.");
-         // Upewnij się, że wszystko jest wyłączone
-         relayMode(HIGH); // Wyłącz wszystkie zawory pokojów
-         ExpOutput.digitalWrite(P6, HIGH); // Wyłącz gaz
-         ExpOutput.digitalWrite(P7, HIGH); // Wyłącz pompę kominka
-         Serial.println("--- End Heating Logic (Invalid Temp) ---");
-         return;
-    }
+    // TYMCZASOWO WYŁĄCZONE - Sprawdzanie temperatury kolektora
+    // // przerwij funkcje jesli nie ma temepratury lub jest za niska
+    // if (isnan(manifoldTemp)) {
+    //      Serial.println("Manifold temperature sensor data is invalid (NaN). Aborting logic.");
+    //      // Upewnij się, że wszystko jest wyłączone
+    //      relayMode(HIGH); // Wyłącz wszystkie zawory pokojów
+    //      ExpOutput.digitalWrite(P6, HIGH); // Wyłącz gaz
+    //      ExpOutput.digitalWrite(P7, HIGH); // Wyłącz pompę kominka
+    //      Serial.println("--- End Heating Logic (Invalid Temp) ---");
+    //      return;
+    // }
 
-    if (manifoldTemp < manifoldMinTemp) {
-        Serial.printf("Manifold temperature (%.1f C) is below minimum operating temp (%.1f C). Aborting logic.\n", manifoldTemp, manifoldMinTemp);
-        // Upewnij się, że wszystko jest wyłączone
-        relayMode(HIGH); // Wyłącz wszystkie zawory pokojów
-        ExpOutput.digitalWrite(P6, HIGH); // Wyłącz gaz
-        ExpOutput.digitalWrite(P7, HIGH); // Wyłącz pompę kominka
-        Serial.println("--- End Heating Logic (Temp Too Low) ---");
-        return;
-    }
+    // if (manifoldTemp < manifoldMinTemp) {
+    //     Serial.printf("Manifold temperature (%.1f C) is below minimum operating temp (%.1f C). Aborting logic.\n", manifoldTemp, manifoldMinTemp);
+    //     // Upewnij się, że wszystko jest wyłączone
+    //     relayMode(HIGH); // Wyłącz wszystkie zawory pokojów
+    //     ExpOutput.digitalWrite(P6, HIGH); // Wyłącz gaz
+    //     ExpOutput.digitalWrite(P7, HIGH); // Wyłącz pompę kominka
+    //     Serial.println("--- End Heating Logic (Temp Too Low) ---");
+    //     return;
+    // }
 
     // --- Logika ogrzewania pokoi ---
     const std::vector<RoomData> &rooms = manager.getAllRooms();
@@ -132,9 +133,10 @@ void manifoldLogicNew()
     }
 
     // --- NOWE: Trzeci przebieg (jeśli temp. kolektora wysoka): Znajdź dodatkowy pokój do otwarcia ---
-    if (manifoldTemp > manifoldMaxTemp) {
-        Serial.printf("Pass 3: High manifold temp (%.1f C > %.1f C). Identifying extra room...\n",
-                      manifoldTemp, manifoldMaxTemp);
+    // TYMCZASOWO WYŁĄCZONE - Logika rozpraszania nadmiaru ciepła
+    // if (manifoldTemp > manifoldMaxTemp) {
+    //     Serial.printf("Pass 3: High manifold temp (%.1f C > %.1f C). Identifying extra room...\n",
+    //                   manifoldTemp, manifoldMaxTemp);
         for (const auto &room : rooms) {
             // Pomiń pokój główny i wtórny, jeśli zostały wybrane
             if (room.ID == primaryRoomId || room.ID == secondaryRoomId || !room.reachable) {
@@ -153,7 +155,7 @@ void manifoldLogicNew()
         } else {
              Serial.println("No suitable extra room found for high temp dissipation.");
         }
-    }
+    // }
 
 
     // --- Sterowanie przekaźnikami ---

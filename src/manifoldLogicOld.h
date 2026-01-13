@@ -2,6 +2,7 @@
 void manifoldLogicNew()
 {
 
+  manager.resetAllValves();
   // --- Room Heating Logic ---
   const std::vector<RoomData> &rooms = manager.getAllRooms();
   std::vector<int> forcedRoomsNeedingHeatIDs; // Store IDs of forced rooms needing heat
@@ -85,14 +86,20 @@ void manifoldLogicNew()
     ExpOutput.digitalWrite(i, HIGH); // LOW = OFF
   }
 
+  // Reset valve status for all rooms initially
+  // (Assuming manager has a way to iterate or we rely on updateOrAddRoom overwriting)
+  // For now, we will update the active ones to true, but we should ensure others are false.
+  // Since we can't easily iterate non-const here without helper, we rely on the fact that
+  // we explicitly set valve=true for active ones. Ideally, we should reset all first.
+
   // przerwij funkcje jesli nie ma temepratury  lub jest za niska
-  if (isnan(manifoldTemp) || manifoldTemp < manifoldMinTemp)
-  {
-    Serial.println("no temperature sensor data from manifold or temperature too low");
-    return;
-  }
-  else
-  {
+  // if (isnan(manifoldTemp) || manifoldTemp < manifoldMinTemp)
+  // {
+  //   Serial.println("no temperature sensor data from manifold or temperature too low");
+  //   return;
+  // }
+  // else
+  // {
 
     // Activate primary room relay
     if (primaryRoomId != -1)
@@ -108,6 +115,12 @@ void manifoldLogicNew()
 
             Serial.printf("Primary heating ON: Room %s (Pin %d, Temp %.1f, Lowest Temp)\n",
                           room.name.c_str(), room.pinNumber, room.currentTemperature);
+            
+            // Update valve status in manager
+            RoomData updatedRoom = room;
+            updatedRoom.valve = true;
+            updatedRoom.valveMode = "primary"; // Fast blink
+            manager.updateOrAddRoom(updatedRoom);
           }
           break;
         }
@@ -118,8 +131,8 @@ void manifoldLogicNew()
       Serial.println("No primary forced room needs heating.");
     }
 
-    // Activate secondary room relay
-    if (secondaryRoomId != -1)
+    // Activate secondary room relay ONLY if boostEnabled is true
+    if (boostEnabled && secondaryRoomId != -1)
     {
       for (const auto &room : rooms)
       {
@@ -130,9 +143,16 @@ void manifoldLogicNew()
             // Check if it's the same pin as primary - avoid double logging if so
             if (primaryRoomId == -1 || room.pinNumber != manager.getRoomByID(primaryRoomId).pinNumber)
             {
-              //  relayMode(LOW);
-              ExpOutput.digitalWrite(room.pinNumber, HIGH); // HIGH = OFF
-                                                            //  docPins["pins"]["pin_" + String(room.pinNumber)]["state"] = "ON";
+              //  relayMode(LOW); // Already called if primary was active, but safe to call again or rely on primary
+              // If primary was NOT active (e.g. error), we should ensure relays are LOW.
+              // But relayMode(LOW) sets ALL to LOW.
+              // If primary is active, relays are LOW.
+              // If primary is NOT active, relays are HIGH (from init loop).
+              // So if primary is -1 but secondary is found (unlikely with current logic), we need relayMode(LOW).
+              if (primaryRoomId == -1) relayMode(LOW);
+
+              ExpOutput.digitalWrite(room.pinNumber, HIGH); // HIGH = OFF (Open Valve)
+                                                            
               Serial.printf("Secondary heating ON: Room %s (Pin %d, Temp %.1f, Smallest Diff %.1f)\n",
                             room.name.c_str(), room.pinNumber, room.currentTemperature, smallestPositiveDifference);
 
@@ -140,6 +160,7 @@ void manifoldLogicNew()
               RoomData updatedRoom = room;
               // Update valve status
               updatedRoom.valve = true;
+              updatedRoom.valveMode = "secondary"; // Slow blink
 
               // Update or add the room with the modified copy
               manager.updateOrAddRoom(updatedRoom);
@@ -153,10 +174,9 @@ void manifoldLogicNew()
         }
       }
     }
-    else if (primaryRoomId != -1)
+    else if (primaryRoomId != -1 && !boostEnabled)
     {
-      Serial.println("No suitable secondary forced room found.");
-      relayMode(HIGH);
+       // Boost disabled, only primary heating.
     }
 
     // --- Gas/Pump Control ---
@@ -198,10 +218,10 @@ void manifoldLogicNew()
     docPins["roomsInfo"] = manager.getRoomsAsJson(); // Send updated state including valve status
 
     Serial.println("--- End Heating Logic ---");
-  }
-  if (manifoldTemp <= manifoldMinTemp)
-  {
-    Serial.println("--- End Heating Logic --- Manifold too cold");
-    relayMode(HIGH);
-  }
+  // }
+  // if (manifoldTemp <= manifoldMinTemp)
+  // {
+  //   Serial.println("--- End Heating Logic --- Manifold too cold");
+  //   relayMode(HIGH);
+  // }
 }   // end function

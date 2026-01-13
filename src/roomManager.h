@@ -9,7 +9,7 @@
 #include <map>
 
 // API endpoints
-const char *api_url = "http://netatmo.adamkarski.art/getdata";
+const char *api_url = "http://netatmo.dm73147.domenomania.eu/getdata";
 
 struct RoomData
 {
@@ -28,11 +28,12 @@ struct RoomData
     String anticipating;              // Czy pokój jest w trybie oczekiwania
     float priority;                   // Priorytet pokoju
     bool valve;                       // Czy zawór jest otwarty (dla pokoju z najwyższym priorytetem)
+    String valveMode;                 // Tryb zaworu: "primary", "secondary", "off"
 
-    RoomData() : name(""), ID(-1), pinNumber(0), targetTemperatureNetatmo(0.0), targetTemperatureFireplace(0.0), currentTemperature(0.0), forced(false), battery_state(""), battery_level(0), rf_strength(0), reachable(false), anticipating(""), priority(0), valve(false) {}
+    RoomData() : name(""), ID(-1), pinNumber(0), targetTemperatureNetatmo(0.0), targetTemperatureFireplace(0.0), currentTemperature(0.0), forced(false), battery_state(""), battery_level(0), rf_strength(0), reachable(false), anticipating(""), priority(0), valve(false), valveMode("off") {}
 
-    RoomData(const std::string &name, int ID, int pinNumber, float targetTemperatureNetatmo, float targetTemperatureFireplace, float currentTemperature, bool forced, const String &battery_state, int battery_level, int rf_strength, bool reachable, const String &anticipating, float priority = 0.0, bool valve = false)
-        : name(name), ID(ID), pinNumber(pinNumber), targetTemperatureNetatmo(targetTemperatureNetatmo), targetTemperatureFireplace(targetTemperatureFireplace), currentTemperature(currentTemperature), forced(forced), battery_state(battery_state), battery_level(battery_level), rf_strength(rf_strength), reachable(reachable), anticipating(anticipating), priority(priority), valve(valve) {}
+    RoomData(const std::string &name, int ID, int pinNumber, float targetTemperatureNetatmo, float targetTemperatureFireplace, float currentTemperature, bool forced, const String &battery_state, int battery_level, int rf_strength, bool reachable, const String &anticipating, float priority = 0.0, bool valve = false, String valveMode = "off")
+        : name(name), ID(ID), pinNumber(pinNumber), targetTemperatureNetatmo(targetTemperatureNetatmo), targetTemperatureFireplace(targetTemperatureFireplace), currentTemperature(currentTemperature), forced(forced), battery_state(battery_state), battery_level(battery_level), rf_strength(rf_strength), reachable(reachable), anticipating(anticipating), priority(priority), valve(valve), valveMode(valveMode) {}
 };
 
 class RoomManager
@@ -73,16 +74,25 @@ public:
             addRoom(room);
         }
     }
-    void updateValveStatus(int roomId, bool valveState)
+    void resetAllValves()
+    {
+        for (auto &room : rooms)
+        {
+            room.valve = false;
+            room.valveMode = "off";
+        }
+    }
+    void updateValveStatus(int roomId, bool valveState, String mode = "off")
     {
         // Iterujemy przez wektor pokoi (potrzebujemy dostępu do modyfikacji)
         for (auto &room : rooms)
         { // 'rooms' jest prywatnym członkiem klasy
             if (room.ID == roomId)
             {
-                if (room.valve != valveState)
+                if (room.valve != valveState || room.valveMode != mode)
                 { // Aktualizuj i loguj tylko jeśli stan się zmienia
                     room.valve = valveState;
+                    room.valveMode = mode;
                     Serial.printf("  [Valve Update] Room %d (%s) valve set to %s\n",
                                   roomId, room.name.c_str(), valveState ? "ON" : "OFF");
                 }
@@ -127,6 +137,7 @@ public:
         if (newRoom.valve != existingRoom.valve)
         {
             existingRoom.valve = newRoom.valve;
+            existingRoom.valveMode = newRoom.valveMode;
         }
 
         // Priority calculation might need adjustment based on which target temp is relevant
@@ -189,55 +200,8 @@ public:
         DynamicJsonDocument docx(2024);
         JsonArray roomsArray = docx.createNestedArray("rooms");
 
-        // Zmienne do śledzenia pokoju z najniższą temperaturą wśród wymuszonych
-        int lowestTempForcedRoomId = -1;
-        float lowestTemp = 100.0; // Inicjalizacja wysoką wartością
-
-        // Zmienne do śledzenia pokoju z najwyższym priorytetem (dla przypadku gdy nie ma wymuszonych)
-        float maxPriority = -999.0;
-        int maxPriorityRoomId = -1;
-
-        // Flaga do śledzenia, czy jakikolwiek pokój jest w trybie wymuszonym
-        bool anyRoomForced = false;
-
-        // Najpierw sprawdź, czy są pokoje w trybie wymuszonym i znajdź ten z najniższą temperaturą
         for (const auto &room : rooms)
         {
-            // Sprawdź, czy pokój jest w trybie wymuszonym
-            if (room.forced)
-            {
-                anyRoomForced = true;
-
-                // Sprawdź, czy ten pokój ma najniższą temperaturę wśród wymuszonych
-                if (room.currentTemperature < lowestTemp)
-                {
-                    lowestTemp = room.currentTemperature;
-                    lowestTempForcedRoomId = room.ID;
-                }
-            }
-
-            // Oblicz priorytet dla przypadku, gdy nie ma pokoi wymuszonych
-            // Use Netatmo target for this calculation as decided earlier
-            float roomPriority = room.targetTemperatureNetatmo - room.currentTemperature;
-            if (roomPriority > maxPriority)
-            {
-                maxPriority = roomPriority;
-                maxPriorityRoomId = room.ID;
-            }
-        }
-
-        for (auto &room : rooms)
-        {
-            // Ustaw valve na true tylko dla pokoju z najniższą temperaturą wśród wymuszonych
-            // Jeśli nie ma pokoi wymuszonych, żaden pokój nie powinien mieć valve=true
-            if (anyRoomForced)
-            {
-                room.valve = (room.ID == lowestTempForcedRoomId);
-            }
-            else
-            {
-                room.valve = false; // Jeśli nie ma pokoi wymuszonych, żaden nie ma valve=true
-            }
 
             JsonObject roomObject = roomsArray.createNestedObject();
             roomObject["name"] = room.name;
@@ -255,6 +219,7 @@ public:
             // Priority sent is based on Netatmo target, actual logic uses effective target
             roomObject["priority"] = room.targetTemperatureNetatmo - room.currentTemperature;
             roomObject["valve"] = room.valve;
+            roomObject["valveMode"] = room.valveMode;
         }
 
         // Kopiowanie docPins do meta w docx
@@ -297,7 +262,7 @@ public:
             HTTPClient http;
 
             // Note: Using String() for float conversion might lose precision, consider dtostrf if needed
-            String url = "http://netatmo.adamkarski.art/setRoomTemperature?mode=manual&temperature=" + String(temp, 1) + "&room_id=" + String(roomID);
+            String url = "http://netatmo.dm73147.domenomania.eu/setRoomTemperature?mode=manual&temperature=" + String(temp, 1) + "&room_id=" + String(roomID);
             http.begin(client, url);
             int httpCode = http.GET();
 

@@ -9,7 +9,7 @@
 #include <map>
 
 // API endpoints
-const char *api_url = "http://netatmo.adamkarski.art/getdata";
+const char *api_url = "http://netatmo.dm73147.domenomania.eu/getdata";
 
 // Mapowanie ID na piny
 std::map<int, int> idToPinMap = {
@@ -265,7 +265,7 @@ public:
 
             HTTPClient http;
    
-            String url = "http://netatmo.adamkarski.art/setRoomTemperature?mode=manual&temperature=" + String(setTemperature) + "&room_id=" + String(roomID);
+            String url = "http://netatmo.dm73147.domenomania.eu/setRoomTemperature?mode=manual&temperature=" + String(setTemperature) + "&room_id=" + String(roomID);
             http.begin(client, url);   
             int httpCode = http.GET();
 

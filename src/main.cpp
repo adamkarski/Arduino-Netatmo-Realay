@@ -41,6 +41,7 @@ String woodStove;
 String state;
 String pin;
 bool useGaz_ = false; // use gas? button on webPage - Will be loaded from EEPROM
+bool boostEnabled = false; // Czy włączać drugi pokój (Boost)?
 unsigned long lastSendTime = 0;
 unsigned long previousMillis = 0; // Variable to store the previous time
 // const long interval = 480 * 60 * 1000; // Interval at which to reset the NodeMCU
@@ -115,6 +116,7 @@ void prepareDataForWebServer()
   docPins["manifoldTemp"] = "";
   docPins["netatmoData"] = "";
   docPins["usegaz"] = useGaz_ ? "true" : "false"; // Initialize based on loaded/default useGaz_
+  docPins["boostEnabled"] = boostEnabled ? "true" : "false";
 }
 
 void handleRoot()
@@ -247,6 +249,12 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
       saveSettings(manager, useGaz_, manifoldTemp); // Save after change
     }
 
+    if (docInput["command"] == "setBoostEnabled")
+    {
+      boostEnabled = docInput["value"];
+      docPins["boostEnabled"] = boostEnabled ? "true" : "false";
+    }
+
     if (docInput["command"] == "act_temperature")
     {
       int id = docInput["id"];
@@ -357,6 +365,7 @@ void broadcastWebsocket()
 {
   docPins["manifoldMinTemp"] = String(manifoldMinTemp);
   docPins["manifoldTemp"] = String(manifoldTemp);
+  docPins["boostEnabled"] = boostEnabled ? "true" : "false";
 
   String data = manager.getRoomsAsJson();
   webSocket.broadcastTXT(data);
@@ -409,10 +418,11 @@ void setup()
   } // Wait for serial connection
   Serial.println("\nStarting up...");
 
+  // Inicjalizacja czujnika temperatury AHT10
   if (!sensor.begin())
   {
-    Serial.println("Failed to initialize AHT10");
-    while (1);
+    Serial.println("Failed to initialize AHT10. Continuing execution without sensor.");
+    // while (1); // Płytka wejdzie w pętlę, co prawdopodobnie spowoduje restart przez watchdog.
   }
 
   // -- Initialize EEPROM --
@@ -512,6 +522,7 @@ void setup()
   timers.attach(0, 65000, fetchNetatmo);
   timers.attach(1, 12000, broadcastWebsocket);
   timers.attach(2, 20000, manifoldLogicNew);
+  // Odczyt temperatury z czujnika AHT10
   timers.attach(3, 150000, readAHT);
 }
 

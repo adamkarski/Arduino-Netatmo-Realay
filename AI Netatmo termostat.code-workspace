@@ -7,6 +7,9 @@
 	],
 	"settings": {
 		"files.associations": {
+			"*.embeddedhtml": "html",
+			"**/frontmatter.json": "jsonc",
+			"**/.frontmatter/config/*.json": "jsonc",
 			"__bit_reference": "cpp",
 			"__hash_table": "cpp",
 			"__split_buffer": "cpp",
@@ -35,7 +38,8 @@
 			"istream": "cpp",
 			"numeric": "cpp",
 			"sstream": "cpp",
-			"streambuf": "cpp"
+			"streambuf": "cpp",
+			"functional": "cpp"
 		}
 	}
 }

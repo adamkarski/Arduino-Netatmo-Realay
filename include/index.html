@@ -335,10 +335,14 @@
                 <tr>
                   <td> <label>Minimalna temperatura na rozdzielaczu<br> potrzebna do włączenia grzania:</label></td>
                   <td> <input type="number" class="manifoldMinTemp" ></td>
-                </tr></tr>
+                </tr>
                 <tr>
                   <td><label>Róznica temperatur<br>do włączenia drugiego obiegu:</label></td>
                   <td><input type="number" class="boostThreshold" ></td>
+                </tr>
+                <tr>
+                  <td><label>Tryb Boost (Drugi pokój):</label></td>
+                  <td><input type="checkbox" class="boostEnabled"></td>
                 </tr>
 
                 <tr>
@@ -368,7 +372,7 @@
         </div>
 
         <!-- Zawartość zakładki POKOJE -->
-        <div class="tab-content" id="rooms-tab" style="display: none;">
+        <div class="tab-content" id="rooms-tab" style="display: block;">
           <div id="roomList"></div>
         </div>
 
@@ -383,10 +387,6 @@
       </div>
     </div>
 
-
-
-
     <script type="text/javascript" src="src/app.js"></script>
-
   </body>
 </html>
