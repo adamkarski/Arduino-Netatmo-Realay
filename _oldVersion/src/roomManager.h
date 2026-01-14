@@ -13,10 +13,13 @@ const char *api_url = "http://netatmo.dm73147.domenomania.eu/getdata";
 
 // Mapowanie ID na piny
 std::map<int, int> idToPinMap = {
-    {1812451076, 1},
-    {206653929, 2},
-    {1868270675, 3},
-    {38038562, 4}
+    {1868270675, 0},
+    {206653929, 1},
+    {1812451076, 2},
+    {38038562, 3}
+
+
+   
 };
 
 struct RoomData

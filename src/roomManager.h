@@ -7,6 +7,7 @@
 #include <string>
 #include <iostream>
 #include <map>
+#include <deque>
 
 // API endpoints
 const char *api_url = "http://netatmo.dm73147.domenomania.eu/getdata";
@@ -29,11 +30,21 @@ struct RoomData
     float priority;                   // Priorytet pokoju
     bool valve;                       // Czy zawór jest otwarty (dla pokoju z najwyższym priorytetem)
     String valveMode;                 // Tryb zaworu: "primary", "secondary", "off"
+    std::deque<float> tempHistory;    // Historia temperatur do wykresu
 
     RoomData() : name(""), ID(-1), pinNumber(0), targetTemperatureNetatmo(0.0), targetTemperatureFireplace(0.0), currentTemperature(0.0), forced(false), battery_state(""), battery_level(0), rf_strength(0), reachable(false), anticipating(""), priority(0), valve(false), valveMode("off") {}
 
     RoomData(const std::string &name, int ID, int pinNumber, float targetTemperatureNetatmo, float targetTemperatureFireplace, float currentTemperature, bool forced, const String &battery_state, int battery_level, int rf_strength, bool reachable, const String &anticipating, float priority = 0.0, bool valve = false, String valveMode = "off")
         : name(name), ID(ID), pinNumber(pinNumber), targetTemperatureNetatmo(targetTemperatureNetatmo), targetTemperatureFireplace(targetTemperatureFireplace), currentTemperature(currentTemperature), forced(forced), battery_state(battery_state), battery_level(battery_level), rf_strength(rf_strength), reachable(reachable), anticipating(anticipating), priority(priority), valve(valve), valveMode(valveMode) {}
+
+    // Metoda do dodawania odczytu do historii
+    void addHistory(float temp) {
+        tempHistory.push_back(temp);
+        // Przechowuj ostatnie 40 odczytów (przy odświeżaniu co ~65s daje to ok. 45 minut historii)
+        if (tempHistory.size() > 40) {
+            tempHistory.pop_front();
+        }
+    }
 };
 
 class RoomManager
@@ -42,9 +53,9 @@ public:
     RoomManager() : requestInProgress(false)
     {
         // Inicjalizacja domyślnego mapowania ID na piny
-        idToPinMap[1812451076] = 0; // ŁAZIENKA
+        idToPinMap[1868270675] = 0; // ŁAZIENKA
         idToPinMap[206653929] = 1;  // KUCHNIA
-        idToPinMap[1868270675] = 2; // AE SYPIALNIA
+        idToPinMap[1812451076] = 2; // AE SYPIALNIA
         idToPinMap[38038562] = 3;   // WALERIA
     }
 
@@ -119,8 +130,10 @@ public:
         if (newRoom.pinNumber != 0) // Keep existing pin if new one is 0
             existingRoom.pinNumber = newRoom.pinNumber;
 
-        if (newRoom.currentTemperature != 0.0) // Or use epsilon comparison
+        if (newRoom.currentTemperature != 0.0) { // Or use epsilon comparison
             existingRoom.currentTemperature = newRoom.currentTemperature;
+            existingRoom.addHistory(newRoom.currentTemperature); // Dodaj do historii
+        }
         if (newRoom.battery_state != "")
             existingRoom.battery_state = newRoom.battery_state;
         if (newRoom.battery_level != 0)
@@ -220,6 +233,12 @@ public:
             roomObject["priority"] = room.targetTemperatureNetatmo - room.currentTemperature;
             roomObject["valve"] = room.valve;
             roomObject["valveMode"] = room.valveMode;
+
+            // Dodaj historię do JSON
+            JsonArray history = roomObject.createNestedArray("history");
+            for (float t : room.tempHistory) {
+                history.add(t);
+            }
         }
 
         // Kopiowanie docPins do meta w docx

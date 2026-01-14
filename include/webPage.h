@@ -18,6 +18,14 @@
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
+.sparkline-container {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 5px 0;
+}
 .valve-indicator {
   width: 8px;
   height: 8px;
@@ -1143,6 +1151,7 @@ button {
       href="//cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"
       rel="stylesheet"
     />
+  
 
     <!-- FAVICON GENERATION  -->
     <link
@@ -1499,7 +1508,36 @@ button {
       </div>
     </div>
 
-    <script type="text/javascript">class Room {
+    <script type="text/javascript">// Funkcja generująca mały wykres (Sparkline) SVG
+function createSparkline(data, width = 260, height = 35) {
+  if (!data || data.length < 2) return '';
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+
+  const padding = 3;
+  const drawHeight = height - 2 * padding;
+  const step = width / (data.length - 1);
+
+  const points = data.map((val, i) => {
+      const x = i * step;
+      const y = height - padding - ((val - min) / range) * drawHeight;
+      return `${x},${y}`;
+  }).join(' ');
+
+  const isRising = data[data.length - 1] >= data[0];
+  const strokeColor = isRising ? '#ff4444' : '#4444ff'; // Czerwony (rośnie) / Niebieski (spada)
+
+  return `
+      <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="overflow: visible;">
+          <polyline points="${points}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+          <circle cx="${width}" cy="${height - padding - ((data[data.length - 1] - min) / range) * drawHeight}" r="3" fill="${strokeColor}" />
+      </svg>
+  `;
+}
+
+class Room {
   /**
   * @param {string} id
   * @param {string} name
@@ -1589,6 +1627,10 @@ button {
    temperatures.appendChild(currentTemp);
    temperatures.appendChild(targetTempNetatmo);
    temperatures.appendChild(targetTempFireplace); // Add fireplace temp display
+
+   // Kontener na wykres
+   const sparklineContainer = document.createElement("div");
+   sparklineContainer.classList.add("sparkline-container");
 
    const quickActions = document.createElement("div");
    quickActions.classList.add("quick-actions");
@@ -1706,6 +1748,7 @@ button {
    card.appendChild(backButton);
    card.appendChild(title);
    card.appendChild(temperatures);
+   card.appendChild(sparklineContainer); // Dodajemy wykres pod temperaturami
    card.appendChild(quickActions);
    card.appendChild(controls);
    card.appendChild(priorityDisplay);
@@ -2004,6 +2047,14 @@ button {
    this.valve = data.valve || false; // Update valve status if available
    this.valveMode = data.valveMode || "off";
    this.pinNumber = data.pinNumber || this.pinNumber; // Update pin number if available
+
+   // Aktualizacja wykresu (Sparkline)
+   if (data.history) {
+       const container = this.element.querySelector(".sparkline-container");
+       if (container) {
+           container.innerHTML = createSparkline(data.history);
+       }
+   }
 
    // Update UI elements
    this.element.querySelector( // Current Temp
