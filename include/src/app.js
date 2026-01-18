@@ -1,5 +1,5 @@
 // Funkcja generująca mały wykres (Sparkline) SVG
-function createSparkline(data, width = 260, height = 35) {
+function createSparkline(data, width = 30, height = 30) {
   if (!data || data.length < 2) return '';
 
   const min = Math.min(...data);
@@ -559,9 +559,9 @@ class Room {
 
    // Update slider positions
    const netatmoSlider = this.element.querySelector(".netatmo-slider");
-   if (netatmoSlider) netatmoSlider.value = this.targetTemperatureNetatmo;
+   if (netatmoSlider && document.activeElement !== netatmoSlider) netatmoSlider.value = this.targetTemperatureNetatmo;
    const fireplaceSlider = this.element.querySelector(".fireplace-slider");
-   if (fireplaceSlider) fireplaceSlider.value = this.targetTemperatureFireplace;
+   if (fireplaceSlider && document.activeElement !== fireplaceSlider) fireplaceSlider.value = this.targetTemperatureFireplace;
 
     // Update forced button state
    const fireButton = this.element.querySelector(".action-button.a_fire");
@@ -641,13 +641,15 @@ function handleWebSocketMessage(data) {
 
  if(parsedData.meta && parsedData.meta.manifoldTemp !== undefined){
        
-       el = document.querySelector("footer .a_fire .manifoldTemp");
-       manifoldTemperature = parsedData.meta.manifoldTemp;
-       el.innerHTML = manifoldTemperature + "°C";
+       const el = document.querySelector("footer .a_fire .manifoldTemp");
+       if (el) {
+           el.innerHTML = parsedData.meta.manifoldTemp + "°C";
+       }
  }
  if(parsedData.meta && parsedData.meta.manifoldMinTemp !== undefined){
        console.log("Min operating temperature:", parsedData.meta.manifoldMinTemp);
-       document.querySelector("#configModal .manifoldMinTemp").value = Number(parsedData.meta.manifoldMinTemp);
+       const minTempInput = document.querySelector("#configModal .manifoldMinTemp");
+       if (minTempInput) minTempInput.value = Number(parsedData.meta.manifoldMinTemp);
      
  
  }
@@ -749,6 +751,7 @@ function handleWebSocketMessage(data) {
 }
 
 let ws;
+let shouldReloadOnReconnect = false;
 const wsStatusElement = document.getElementById("ws-status");
 
 function setWsStatus(status) {
@@ -781,6 +784,10 @@ function connectWebSocket() {
  ws.onopen = function (event) {
    console.log("WebSocket connection opened:", event);
    setWsStatus("connected");
+   if (shouldReloadOnReconnect) {
+     window.location.reload();
+   }
+   shouldReloadOnReconnect = true;
    // Send a message to the server if needed
    // ws.send(JSON.stringify({ message: "Hello Server!" }));
  };

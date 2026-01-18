@@ -14,7 +14,8 @@
 #error platformio.ini must contain "build_flags = -DIOTWEBCONF_ENABLE_JSON"
 #endif
 
-StaticJsonDocument<8192> docPins;
+// Zmniejszono z 8192 - 2KB wystarczy na statusy pinów, oszczędzamy 6KB RAM
+StaticJsonDocument<2048> docPins;
 StaticJsonDocument<1124> docRooms;
 StaticJsonDocument<200> docInput;
 
@@ -47,12 +48,13 @@ unsigned long previousMillis = 0; // Variable to store the previous time
 // const long interval = 480 * 60 * 1000; // Interval at which to reset the NodeMCU
 
 // AHT10 INIT;
-// #include <Adafruit_AHTX0.h>
-// Adafruit_AHTX0 aht;
-// sensors_event_t humidity, temp;
+#include <Adafruit_AHTX0.h>
+Adafruit_AHTX0 aht;
+sensors_event_t humidity, temp;
+bool ahtFound = false;
 
-#include <aht10sensor.h>
-AHT10 sensor;
+// #include <aht10sensor.h>
+// AHT10 sensor;
 
 float manifoldTemp, manifoldHum;
 float manifoldMinTemp = 18.0;
@@ -60,35 +62,11 @@ float manifoldMaxTemp = 60.0;
 
 void readAHT()
 {
-
- float temp_reading, hum_reading;
-    // Serial.printf("Attempting AHT read. Last known Temp: %.1f, Errors: %d\n", manifoldTemp, aht_read_errors); // Log
-
-    if (sensor.measure(&temp_reading, &hum_reading)) {
-        manifoldTemp = temp_reading;
-        manifoldHum = hum_reading;
-        // Serial.printf("AHT Read OK: Temp=%.1f, Hum=%.1f\n", manifoldTemp, manifoldHum);
-        aht_read_errors = 0; // Resetuj licznik błędów po sukcesie
-    } else {
-        Serial.println("AHT Measurement failed.");
-        aht_read_errors++;
-        if (aht_read_errors >= MAX_AHT_ERRORS_BEFORE_RESET) {
-            Serial.printf("Reached %d AHT read errors. Attempting sensor reset and re-init...\n", aht_read_errors);
-            if (sensor.softReset()) {
-                delay(100); // Daj czas na ustabilizowanie
-                if (sensor.begin()) {
-                     Serial.println("AHT Sensor re-initialized successfully after reset.");
-                     aht_read_errors = 0; // Resetuj licznik po udanej reinicjalizacji
-                } else {
-                     Serial.println("AHT Sensor re-initialization FAILED after reset.");
-                     // Błąd nadal występuje, licznik nie jest resetowany
-                }
-            } else {
-                 Serial.println("AHT Sensor soft reset command FAILED.");
-                 // Błąd nadal występuje
-            }
-        }
-   }
+  if (!ahtFound) return;
+  aht.getEvent(&humidity, &temp);
+  manifoldTemp = temp.temperature;
+  manifoldHum = humidity.relative_humidity;
+  Serial.printf("AHT Read: Temp=%.1f, Hum=%.1f\n", manifoldTemp, manifoldHum);
 }
 
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -226,10 +204,9 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
     //{"command":"usegaz","value":"true"}
     if (docInput["command"] == "manifoldMinTemp")
     {
-
       // value to float
-
       manifoldMinTemp = docInput["value"].as<float>();
+      saveSettings(manager, useGaz_, manifoldMinTemp, boostEnabled); // Zapisz po zmianie
     }
     if (docInput["command"] == "usegaz")
     {
@@ -246,13 +223,14 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
         useGaz_ = false;
         docPins["usegaz"] = "false";
       }
-      saveSettings(manager, useGaz_, manifoldTemp); // Save after change
+      saveSettings(manager, useGaz_, manifoldMinTemp, boostEnabled); // Save after change
     }
 
     if (docInput["command"] == "setBoostEnabled")
     {
       boostEnabled = docInput["value"];
       docPins["boostEnabled"] = boostEnabled ? "true" : "false";
+      saveSettings(manager, useGaz_, manifoldMinTemp, boostEnabled); // Zapisz po zmianie
     }
 
     if (docInput["command"] == "act_temperature")
@@ -270,7 +248,7 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
       int id = docInput["id"];
       float targetTemperatureFireplace = docInput["targetTemperatureFireplace"]; // Value from Slider 2
       manager.setFireplaceTemperature(id, targetTemperatureFireplace);           // Update local fireplace target only
-      saveSettings(manager, useGaz_, manifoldTemp);                                            // Save after change
+      saveSettings(manager, useGaz_, manifoldMinTemp, boostEnabled);             // Save after change
     }
 
     // }
@@ -280,56 +258,54 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
       int id = docInput["id"];
 
       // Znajdz Room ktorego ID == id
-      RoomData room = manager.getRoomByID(id);
-      // get pinNumber from room
-      int pinNumber = room.pinNumber;
-      String pin = "pin_" + String(pinNumber);
+      RoomData* roomPtr = manager.getRoomByID(id);
+      
+      if (roomPtr != nullptr)
+      {
+        int pinNumber = roomPtr->pinNumber;
+        String pin = "pin_" + String(pinNumber);
+        bool forced = docInput["forced"];
 
-      // float targetTemperature = docInput["targetTemperature"]; // This might be ambiguous now
-      bool forced = docInput["forced"];
+        // Update the forced status directly via pointer (no copy needed)
+        roomPtr->forced = forced;
+        
+        // We can call updateOrAddRoom if we want to trigger specific update logic, 
+        // but direct modification is faster if we just want to save.
+        // manager.updateOrAddRoom(*roomPtr); 
 
-      // if (forced ==0){forced="false";}else(forced="true");
-      // Update the forced status directly in the manager
-      // We don't need to update temperature here as that's handled by separate commands
-      RoomData updatedRoom = manager.getRoomByID(id); // Get existing data
-      if (updatedRoom.ID != -1)
-      {                                       // Check if room exists
-        updatedRoom.forced = forced;          // Update only the forced status
-        manager.updateOrAddRoom(updatedRoom); // Use updateOrAddRoom to save the change
         Serial.printf("Forced status for room %d set to %s\n", id, forced ? "true" : "false");
-        saveSettings(manager, useGaz_, manifoldTemp); // Save after change
+        saveSettings(manager, useGaz_, manifoldMinTemp, boostEnabled); // Save after change
+
+        // Update docPins for immediate UI feedback
+        if (pinNumber >= 0 && pinNumber < 6)
+        { // Assuming pins 0-5 are for rooms
+          String pinStr = "pin_" + String(pinNumber);
+          if (forced)
+          {
+            docPins["pins"][pinStr]["state"] = "ON"; // Tentative state, logic will confirm
+            docPins["pins"][pinStr]["forced"] = "true";
+          }
+          else
+          {
+            docPins["pins"][pinStr]["state"] = "OFF";
+            docPins["pins"][pinStr]["forced"] = "false";
+          }
+        }
+
+        if (forced)
+        {
+          docPins["pins"][pin]["state"] = "ON";
+          docPins["pins"][pin]["forced"] = "true";
+        }
+        else
+        {
+          docPins["pins"][pin]["state"] = "OFF";
+          docPins["pins"][pin]["forced"] = "false";
+        }
       }
       else
       {
         Serial.printf("Error: Room %d not found when trying to set forced status.\n", id);
-      }
-
-      // Update docPins for immediate UI feedback (though manifoldLogicNew will also update it)
-      // Ensure pinNumber is valid before accessing docPins
-      if (pinNumber >= 0 && pinNumber < 6)
-      { // Assuming pins 0-5 are for rooms
-        String pinStr = "pin_" + String(pinNumber);
-        if (forced)
-        {
-          docPins["pins"][pinStr]["state"] = "ON"; // Tentative state, logic will confirm
-          docPins["pins"][pinStr]["forced"] = "true";
-        }
-        else
-        {
-          docPins["pins"][pinStr]["state"] = "OFF";
-          docPins["pins"][pinStr]["forced"] = "false";
-        }
-      }
-
-      if (forced)
-      {
-        docPins["pins"][pin]["state"] = "ON";
-        docPins["pins"][pin]["forced"] = "true";
-      }
-      else
-      {
-        docPins["pins"][pin]["state"] = "OFF";
-        docPins["pins"][pin]["forced"] = "false";
       }
     }
 
@@ -344,7 +320,7 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
       int roomId = docInput["roomId"];
       int newPin = docInput["pin"];
       manager.updatePinMapping(roomId, newPin);
-      saveSettings(manager, useGaz_, manifoldTemp); // Save after change
+      saveSettings(manager, useGaz_, manifoldMinTemp, boostEnabled); // Save after change
 
       // Potwierdź aktualizację
       String response = "{\"response\":\"pinUpdated\",\"roomId\":" + String(roomId) +
@@ -357,6 +333,8 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
     webSocket.sendTXT(num, ackMessage);
   }
   break;
+  default:
+    break;
   }
 }
 
@@ -418,26 +396,34 @@ void setup()
   } // Wait for serial connection
   Serial.println("\nStarting up...");
 
+  // Zabezpieczenie przed zawieszeniem magistrali I2C (Watchdog dla I2C)
+  // Jeśli urządzenie slave przytrzyma linię zegara dłużej, ESP nie zawiesi się na amen.
+  Wire.begin();
+  Wire.setClockStretchLimit(1000); 
+
   // Inicjalizacja czujnika temperatury AHT10
-  if (!sensor.begin())
+  if (!aht.begin())
   {
     Serial.println("Failed to initialize AHT10. Continuing execution without sensor.");
+    ahtFound = false;
     // while (1); // Płytka wejdzie w pętlę, co prawdopodobnie spowoduje restart przez watchdog.
-  }
+  } else {
+    ahtFound = true;
+  } 
 
   // -- Initialize EEPROM --
   EEPROM.begin(EEPROM_SIZE); // Use the requested size (512)
   Serial.printf("EEPROM size requested: %d bytes\n", EEPROM_SIZE);
 
   // -- Load settings or initialize EEPROM --
-  if (!loadSettings(manager,useGaz_, manifoldTemp))
+  if (!loadSettings(manager, useGaz_, manifoldMinTemp, boostEnabled))
   {
     // EEPROM not initialized or data corrupted, save defaults
     Serial.println("Initializing EEPROM with default settings...");
     useGaz_ = false; // Default value
     // Manager defaults (like initial pin map) are set in its constructor.
     // We save the current state which includes these defaults.
-    saveSettings(manager, useGaz_, manifoldTemp);
+    saveSettings(manager, useGaz_, manifoldMinTemp, boostEnabled);
   }
   // Update docPins based on potentially loaded useGaz_ value AFTER loading attempt
   docPins["usegaz"] = useGaz_ ? "true" : "false";
@@ -453,7 +439,7 @@ void setup()
 
   delay(3000);
 
-  iotWebConf.setApTimeoutMs(0);
+  iotWebConf.setApTimeoutMs(600000); // Ustaw timeout AP na 10 minut (600000ms), potem restart
   iotWebConf.init();
   // -- Set up required URL handlers on the web server.
   server.on("/", handleRoot);
@@ -562,7 +548,8 @@ void loop()
 
     webSocket.loop();
     ArduinoOTA.handle();
-
-    timers.process();
   }
+  
+  // Logika i timery powinny działać niezależnie od statusu WiFi (np. sterowanie piecem offline)
+  timers.process();
 }

@@ -1,48 +1,65 @@
+#ifndef ROOMMANAGER_H
+#define ROOMMANAGER_H
+
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 #include <EEPROM.h>
 #include <vector>
-#include <string>
 #include <iostream>
 #include <map>
-#include <deque>
+#include <cstring>
 
 // API endpoints
 const char *api_url = "http://netatmo.dm73147.domenomania.eu/getdata";
 
 struct RoomData
 {
-    std::string name;                 // Nazwa pokoju
+    char name[32];                    // Nazwa pokoju (char[] zamiast String)
     int ID;                           // ID pokoju
-    int pinNumber;                    // Numer przyporzadkowanego pinu
+    int8_t pinNumber;                 // Numer przyporzadkowanego pinu (zmniejszono z int)
     float targetTemperatureNetatmo;   // Temperatura zadana Netatmo (Slider 1)
     float targetTemperatureFireplace; // Temperatura zadana Kominek (Slider 2)
     float currentTemperature;         // Temperatura aktualna
     bool forced;                      // Czy jest to tryb wymuszony
-    String battery_state;             // Stan baterii
-    int battery_level;                // Poziom baterii
-    int rf_strength;                  // Siła sygnału
-    String type;                      // Typ pokoju
+    char battery_state[12];           // Stan baterii
+    uint16_t battery_level;           // Poziom baterii (zmniejszono z int)
+    uint8_t rf_strength;              // Siła sygnału (zmniejszono z int)
+    char type[16];                    // Typ pokoju
     bool reachable;                   // Czy pokój jest osiągalny
-    String anticipating;              // Czy pokój jest w trybie oczekiwania
+    char anticipating[16];            // Czy pokój jest w trybie oczekiwania
     float priority;                   // Priorytet pokoju
     bool valve;                       // Czy zawór jest otwarty (dla pokoju z najwyższym priorytetem)
-    String valveMode;                 // Tryb zaworu: "primary", "secondary", "off"
-    std::deque<float> tempHistory;    // Historia temperatur do wykresu
+    char valveMode[12];               // Tryb zaworu: "primary", "secondary", "off"
+    std::vector<float> tempHistory;   // Historia temperatur (vector zamiast deque)
 
-    RoomData() : name(""), ID(-1), pinNumber(0), targetTemperatureNetatmo(0.0), targetTemperatureFireplace(0.0), currentTemperature(0.0), forced(false), battery_state(""), battery_level(0), rf_strength(0), reachable(false), anticipating(""), priority(0), valve(false), valveMode("off") {}
+    RoomData() : ID(-1), pinNumber(0), targetTemperatureNetatmo(0.0), targetTemperatureFireplace(0.0), currentTemperature(0.0), forced(false), battery_level(0), rf_strength(0), reachable(false), priority(0), valve(false) 
+    {
+        name[0] = '\0';
+        battery_state[0] = '\0';
+        type[0] = '\0';
+        anticipating[0] = '\0';
+        strcpy(valveMode, "off");
+    }
 
-    RoomData(const std::string &name, int ID, int pinNumber, float targetTemperatureNetatmo, float targetTemperatureFireplace, float currentTemperature, bool forced, const String &battery_state, int battery_level, int rf_strength, bool reachable, const String &anticipating, float priority = 0.0, bool valve = false, String valveMode = "off")
-        : name(name), ID(ID), pinNumber(pinNumber), targetTemperatureNetatmo(targetTemperatureNetatmo), targetTemperatureFireplace(targetTemperatureFireplace), currentTemperature(currentTemperature), forced(forced), battery_state(battery_state), battery_level(battery_level), rf_strength(rf_strength), reachable(reachable), anticipating(anticipating), priority(priority), valve(valve), valveMode(valveMode) {}
+    RoomData(const char* name, int ID, int8_t pinNumber, float targetTemperatureNetatmo, float targetTemperatureFireplace, float currentTemperature, bool forced, const char* battery_state, uint16_t battery_level, uint8_t rf_strength, bool reachable, const char* anticipating, float priority = 0.0, bool valve = false, const char* valveMode = "off")
+        : ID(ID), pinNumber(pinNumber), targetTemperatureNetatmo(targetTemperatureNetatmo), targetTemperatureFireplace(targetTemperatureFireplace), currentTemperature(currentTemperature), forced(forced), battery_level(battery_level), rf_strength(rf_strength), reachable(reachable), priority(priority), valve(valve) 
+    {
+        strncpy(this->name, name, sizeof(this->name) - 1); this->name[sizeof(this->name) - 1] = '\0';
+        strncpy(this->battery_state, battery_state, sizeof(this->battery_state) - 1); this->battery_state[sizeof(this->battery_state) - 1] = '\0';
+        // type nie jest przekazywany w konstruktorze w starym kodzie, ale warto go inicjalizować
+        this->type[0] = '\0'; 
+        strncpy(this->anticipating, anticipating, sizeof(this->anticipating) - 1); this->anticipating[sizeof(this->anticipating) - 1] = '\0';
+        strncpy(this->valveMode, valveMode, sizeof(this->valveMode) - 1); this->valveMode[sizeof(this->valveMode) - 1] = '\0';
+    }
 
     // Metoda do dodawania odczytu do historii
     void addHistory(float temp) {
         tempHistory.push_back(temp);
         // Przechowuj ostatnie 40 odczytów (przy odświeżaniu co ~65s daje to ok. 45 minut historii)
         if (tempHistory.size() > 40) {
-            tempHistory.pop_front();
+            tempHistory.erase(tempHistory.begin()); // Usuń najstarszy element
         }
     }
 };
@@ -63,7 +80,7 @@ public:
     {
         rooms.push_back(room);
         Serial.print("Added room: ");
-        Serial.println(room.name.c_str());
+        Serial.println(room.name);
     }
 
     void updateOrAddRoom(const RoomData &room)
@@ -76,7 +93,7 @@ public:
                 updateRoomParams(existingRoom, room);
                 roomExists = true;
                 Serial.print("Updated room: ");
-                Serial.println(room.name.c_str());
+                Serial.println(room.name);
                 break;
             }
         }
@@ -90,7 +107,7 @@ public:
         for (auto &room : rooms)
         {
             room.valve = false;
-            room.valveMode = "off";
+            strcpy(room.valveMode, "off");
         }
     }
     void updateValveStatus(int roomId, bool valveState, String mode = "off")
@@ -100,12 +117,12 @@ public:
         { // 'rooms' jest prywatnym członkiem klasy
             if (room.ID == roomId)
             {
-                if (room.valve != valveState || room.valveMode != mode)
+                if (room.valve != valveState || strcmp(room.valveMode, mode.c_str()) != 0)
                 { // Aktualizuj i loguj tylko jeśli stan się zmienia
                     room.valve = valveState;
-                    room.valveMode = mode;
+                    strncpy(room.valveMode, mode.c_str(), sizeof(room.valveMode) - 1); room.valveMode[sizeof(room.valveMode) - 1] = '\0';
                     Serial.printf("  [Valve Update] Room %d (%s) valve set to %s\n",
-                                  roomId, room.name.c_str(), valveState ? "ON" : "OFF");
+                                  roomId, room.name, valveState ? "ON" : "OFF");
                 }
                 break; // Znaleziono pokój, można przerwać pętlę
             }
@@ -118,13 +135,14 @@ public:
         if (newRoom.targetTemperatureNetatmo != 0.0) // Or use a small epsilon comparison if needed
             existingRoom.targetTemperatureNetatmo = newRoom.targetTemperatureNetatmo;
 
-        // Note: targetTemperatureFireplace is NOT updated here by default,
-        // it should be updated via setFireplaceTemperature or explicitly if needed.
-        // We keep the existing fireplace target unless specifically told otherwise.
+        // Allow updating fireplace target (e.g. from EEPROM load or explicit update)
+        existingRoom.targetTemperatureFireplace = newRoom.targetTemperatureFireplace;
 
         // Aktualizacja nazwy pokoju
-        if (!newRoom.name.empty())
-            existingRoom.name = newRoom.name;
+        if (strlen(newRoom.name) > 0) {
+            strncpy(existingRoom.name, newRoom.name, sizeof(existingRoom.name) - 1);
+            existingRoom.name[sizeof(existingRoom.name) - 1] = '\0';
+        }
         if (newRoom.ID != -1)
             existingRoom.ID = newRoom.ID;
         if (newRoom.pinNumber != 0) // Keep existing pin if new one is 0
@@ -134,23 +152,27 @@ public:
             existingRoom.currentTemperature = newRoom.currentTemperature;
             existingRoom.addHistory(newRoom.currentTemperature); // Dodaj do historii
         }
-        if (newRoom.battery_state != "")
-            existingRoom.battery_state = newRoom.battery_state;
+        if (strlen(newRoom.battery_state) > 0) {
+            strncpy(existingRoom.battery_state, newRoom.battery_state, sizeof(existingRoom.battery_state) - 1);
+            existingRoom.battery_state[sizeof(existingRoom.battery_state) - 1] = '\0';
+        }
         if (newRoom.battery_level != 0)
             existingRoom.battery_level = newRoom.battery_level;
         if (newRoom.rf_strength != 0)
             existingRoom.rf_strength = newRoom.rf_strength;
         // Always update reachable status
         existingRoom.reachable = newRoom.reachable;
-        if (newRoom.anticipating != "")
-            existingRoom.anticipating = newRoom.anticipating;
+        if (strlen(newRoom.anticipating) > 0) {
+            strncpy(existingRoom.anticipating, newRoom.anticipating, sizeof(existingRoom.anticipating) - 1);
+            existingRoom.anticipating[sizeof(existingRoom.anticipating) - 1] = '\0';
+        }
         // Always update forced status from newRoom data (usually comes from WebSocket update)
 
         existingRoom.forced = newRoom.forced;
         if (newRoom.valve != existingRoom.valve)
         {
             existingRoom.valve = newRoom.valve;
-            existingRoom.valveMode = newRoom.valveMode;
+            strncpy(existingRoom.valveMode, newRoom.valveMode, sizeof(existingRoom.valveMode) - 1); existingRoom.valveMode[sizeof(existingRoom.valveMode) - 1] = '\0';
         }
 
         // Priority calculation might need adjustment based on which target temp is relevant
@@ -159,7 +181,7 @@ public:
         existingRoom.priority = existingRoom.targetTemperatureNetatmo - existingRoom.currentTemperature;
     }
 
-    RoomData getRoom(size_t index)
+    RoomData& getRoom(size_t index)
     {
         if (index < rooms.size())
         {
@@ -168,22 +190,22 @@ public:
         else
         {
             Serial.println("Index out of range");
-            return RoomData(); // Zwraca pusty RoomData w przypadku błędu
+            static RoomData empty; return empty; // Zwraca pusty RoomData w przypadku błędu (bezpieczniej niż kopia)
         }
     }
 
-    // get room by ID
-    RoomData getRoomByID(int roomID)
+    // get room by ID - returns pointer to avoid copy and allow nullptr check
+    RoomData* getRoomByID(int roomID)
     {
-        for (const auto &room : rooms)
+        for (auto &room : rooms)
         {
             if (room.ID == roomID)
             {
-                return room;
+                return &room;
             }
         }
         Serial.println("Room ID not found");
-        return RoomData(); // Zwraca pusty RoomData w przypadku błędu
+        return nullptr;
     }
 
     void updateRoom(size_t index, const RoomData &room)
@@ -210,12 +232,12 @@ public:
 
     String getRoomsAsJson()
     {
-        DynamicJsonDocument docx(2024);
+        // Zwiększono rozmiar dokumentu, aby bezpiecznie zmieścić dane wszystkich pokoi i metadane.
+        DynamicJsonDocument docx(4096);
         JsonArray roomsArray = docx.createNestedArray("rooms");
 
         for (const auto &room : rooms)
         {
-
             JsonObject roomObject = roomsArray.createNestedObject();
             roomObject["name"] = room.name;
             roomObject["id"] = room.ID;
@@ -237,13 +259,19 @@ public:
             // Dodaj historię do JSON
             JsonArray history = roomObject.createNestedArray("history");
             for (float t : room.tempHistory) {
-                history.add(t);
+                // Zaokrąglij do 1 miejsca po przecinku, aby zmniejszyć rozmiar JSON (np. 13.3999 -> 13.4)
+                history.add(round(t * 10.0) / 10.0);
             }
         }
 
-        // Kopiowanie docPins do meta w docx
+        // Zamiast kopiować cały obiekt docPins (co jest ryzykowne ze względu na rozmiar),
+        // dodajemy tylko potrzebne pola do obiektu "meta".
         JsonObject meta = docx.createNestedObject("meta");
-        meta.set(docPins.as<JsonObject>());
+        meta["manifoldMinTemp"] = docPins["manifoldMinTemp"];
+        meta["manifoldTemp"] = docPins["manifoldTemp"];
+        meta["boostEnabled"] = docPins["boostEnabled"];
+        meta["usegaz"] = docPins["usegaz"];
+        // Upewnij się, że inne potrzebne wartości (np. boostThreshold) są również dodawane do docPins lub przekazywane tutaj.
 
         String jsonString;
 
@@ -357,6 +385,7 @@ public:
             WiFiClient client;
 
             HTTPClient http;
+            http.setTimeout(2500); // Zmniejszono timeout do 2.5s (bezpieczne dla WDT)
             http.begin(client, url);
             int httpCode = http.GET();
 
@@ -364,15 +393,20 @@ public:
 
             if (httpCode > 0)
             {
-                String payload = http.getString();
-                // Serial.println("Received payload:_______________________");
-                // Serial.println(payload);
+                // OPTYMALIZACJA: Zamiast pobierać cały String (payload), parsujemy strumieniowo.
+                // To oszczędza mnóstwo pamięci RAM i zapobiega fragmentacji.
+                DynamicJsonDocument doc(5120); // Zmniejszono do 5KB dla bezpieczeństwa pamięci
+                
+                // Używamy http.getStream() zamiast http.getString()
+                DeserializationError error = deserializeJson(doc, http.getStream());
 
-                if (payload.length() > 0)
-                {
-                    DynamicJsonDocument doc(2048);
-                    deserializeJson(doc, payload);
-                    //  {
+                if (error) {
+                    Serial.print(F("Błąd podczas parsowania JSON z API Netatmo: "));
+                    Serial.println(error.c_str());
+                    setRequestInProgress(false);
+                    return;
+                }
+
                     //       "id": "1812451076",
                     //       "reachable": true,
                     //       "anticipating": null,
@@ -386,17 +420,20 @@ public:
                     //       "battery_level": 4160,
                     //       "rf_strength": 71
                     //     },
-                    JsonArray rooms = doc["rooms"];
+                JsonArray rooms = doc["rooms"];
+                if (!rooms.isNull()) {
                     for (JsonObject room : rooms)
                     {
-                        std::string name = room["name"].as<const char *>();
+                        const char* namePtr = room["name"].as<const char*>();
+                        const char* name = namePtr ? namePtr : "Unknown";
+                        
                         int id = room["id"].as<int>();
                         float currentTemperature = room["therm_measured_temperature"].as<float>();
                         float targetTemperatureNetatmo = room["therm_setpoint_temperature"].as<float>(); // This is Netatmo's target
                         // Preserve existing forced status and fireplace target
                         bool forced = false;
                         float targetTemperatureFireplace = 0.0; // Default if room doesn't exist yet
-                        int existingPinNumber = 0;              // Default pin
+                        int8_t existingPinNumber = 0;           // Default pin
 
                         // Sprawdź, czy pokój już istnieje w naszej kolekcji
                         for (const auto &existingRoom : this->rooms)
@@ -410,16 +447,16 @@ public:
                             }
                         }
 
-                        String battery_state = room["battery_state"].as<const char *>();
-                        int battery_level = room["battery_level"].as<int>();
-                        int rf_strength = room["rf_strength"].as<int>();
-                        String type = room["type"].as<const char *>();
+                        const char* battery_state = room["battery_state"].as<const char *>();
+                        uint16_t battery_level = room["battery_level"].as<uint16_t>();
+                        uint8_t rf_strength = room["rf_strength"].as<uint8_t>();
+                        const char* type = room["type"].as<const char *>();
                         bool reachable = room["reachable"].as<bool>();
-                        String anticipating = room["anticipating"].as<const char *>();
+                        const char* anticipating = room["anticipating"].as<const char *>();
                         // Priority calculation is done in updateRoomParams
 
                         // Determine pin number: use existing if available, otherwise map from ID
-                        int pinNumber = (existingPinNumber != 0) ? existingPinNumber : this->idToPinMap[id];
+                        int8_t pinNumber = (existingPinNumber != 0) ? existingPinNumber : (int8_t)this->idToPinMap[id];
                         if (pinNumber == 0 && existingPinNumber == 0)
                         { // Check if ID was not in map initially
                             Serial.printf("Warning: No pin mapping found for new room ID %d. Defaulting to 0.\n", id);
@@ -427,14 +464,13 @@ public:
 
                         // Create RoomData object with both temperatures
                         RoomData fetchedRoom(name, id, pinNumber, targetTemperatureNetatmo, targetTemperatureFireplace, currentTemperature, forced, battery_state, battery_level, rf_strength, reachable, anticipating);
+                        
+                        // Set type separately as it's not in constructor
+                        if (type) { strncpy(fetchedRoom.type, type, sizeof(fetchedRoom.type)-1); fetchedRoom.type[sizeof(fetchedRoom.type)-1] = '\0'; }
 
                         // Update or add the room
                         updateOrAddRoom(fetchedRoom);
                     }
-                }
-                else
-                {
-                    Serial.println("Payload is empty");
                 }
             }
             else
@@ -451,7 +487,7 @@ public:
         setRequestInProgress(false);
     }
 
-    std::map<int, int> idToPinMap; // Przenieś mapowanie tutaj
+    std::map<int, int8_t> idToPinMap; // Przenieś mapowanie tutaj, zoptymalizowano typ wartości
 
     void updatePinMapping(int roomId, int newPin)
     {
@@ -502,3 +538,5 @@ private:
     std::vector<RoomData> rooms;
     bool requestInProgress;
 };
+
+#endif

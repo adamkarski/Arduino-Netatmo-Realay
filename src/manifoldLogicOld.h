@@ -114,12 +114,12 @@ void manifoldLogicNew()
             ExpOutput.digitalWrite(room.pinNumber, HIGH); // HIGH = ON
 
             Serial.printf("Primary heating ON: Room %s (Pin %d, Temp %.1f, Lowest Temp)\n",
-                          room.name.c_str(), room.pinNumber, room.currentTemperature);
+                          room.name, room.pinNumber, room.currentTemperature);
             
             // Update valve status in manager
             RoomData updatedRoom = room;
             updatedRoom.valve = true;
-            updatedRoom.valveMode = "primary"; // Fast blink
+            strncpy(updatedRoom.valveMode, "primary", sizeof(updatedRoom.valveMode) - 1); updatedRoom.valveMode[sizeof(updatedRoom.valveMode) - 1] = '\0';
             manager.updateOrAddRoom(updatedRoom);
           }
           break;
@@ -141,7 +141,7 @@ void manifoldLogicNew()
           if (room.pinNumber >= 0 && room.pinNumber < 6)
           {
             // Check if it's the same pin as primary - avoid double logging if so
-            if (primaryRoomId == -1 || room.pinNumber != manager.getRoomByID(primaryRoomId).pinNumber)
+            if (primaryRoomId == -1 || room.pinNumber != manager.getRoomByID(primaryRoomId)->pinNumber)
             {
               //  relayMode(LOW); // Already called if primary was active, but safe to call again or rely on primary
               // If primary was NOT active (e.g. error), we should ensure relays are LOW.
@@ -154,20 +154,20 @@ void manifoldLogicNew()
               ExpOutput.digitalWrite(room.pinNumber, HIGH); // HIGH = OFF (Open Valve)
                                                             
               Serial.printf("Secondary heating ON: Room %s (Pin %d, Temp %.1f, Smallest Diff %.1f)\n",
-                            room.name.c_str(), room.pinNumber, room.currentTemperature, smallestPositiveDifference);
+                            room.name, room.pinNumber, room.currentTemperature, smallestPositiveDifference);
 
               // Create a mutable copy of the room data
               RoomData updatedRoom = room;
               // Update valve status
               updatedRoom.valve = true;
-              updatedRoom.valveMode = "secondary"; // Slow blink
+              strncpy(updatedRoom.valveMode, "secondary", sizeof(updatedRoom.valveMode) - 1); updatedRoom.valveMode[sizeof(updatedRoom.valveMode) - 1] = '\0';
 
               // Update or add the room with the modified copy
               manager.updateOrAddRoom(updatedRoom);
             }
             else
             {
-              Serial.printf("Secondary room (%s) shares pin with primary. Already ON.\n", room.name.c_str());
+              Serial.printf("Secondary room (%s) shares pin with primary. Already ON.\n", room.name);
             }
           }
           break;

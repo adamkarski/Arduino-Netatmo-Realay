@@ -19,12 +19,22 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 .sparkline-container {
-  width: 100%;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   display: flex;
   justify-content: center;
   align-items: center;
   margin: 5px 0;
+  position: absolute;
+  top: 5%;
+  right: 17px;
+  background-color: white;
+  border-radius: 24px;
+  border: solid 0.2px rgba(200, 200, 200, .6);
+  overflow: hidden;
+}
+.sparkline-container svg{
+  opacity: 0.7;
 }
 .valve-indicator {
   width: 8px;
@@ -1509,7 +1519,7 @@ button {
     </div>
 
     <script type="text/javascript">// Funkcja generująca mały wykres (Sparkline) SVG
-function createSparkline(data, width = 260, height = 35) {
+function createSparkline(data, width = 30, height = 30) {
   if (!data || data.length < 2) return '';
 
   const min = Math.min(...data);
@@ -2069,9 +2079,9 @@ class Room {
 
    // Update slider positions
    const netatmoSlider = this.element.querySelector(".netatmo-slider");
-   if (netatmoSlider) netatmoSlider.value = this.targetTemperatureNetatmo;
+   if (netatmoSlider && document.activeElement !== netatmoSlider) netatmoSlider.value = this.targetTemperatureNetatmo;
    const fireplaceSlider = this.element.querySelector(".fireplace-slider");
-   if (fireplaceSlider) fireplaceSlider.value = this.targetTemperatureFireplace;
+   if (fireplaceSlider && document.activeElement !== fireplaceSlider) fireplaceSlider.value = this.targetTemperatureFireplace;
 
     // Update forced button state
    const fireButton = this.element.querySelector(".action-button.a_fire");
@@ -2151,13 +2161,15 @@ function handleWebSocketMessage(data) {
 
  if(parsedData.meta && parsedData.meta.manifoldTemp !== undefined){
        
-       el = document.querySelector("footer .a_fire .manifoldTemp");
-       manifoldTemperature = parsedData.meta.manifoldTemp;
-       el.innerHTML = manifoldTemperature + "°C";
+       const el = document.querySelector("footer .a_fire .manifoldTemp");
+       if (el) {
+           el.innerHTML = parsedData.meta.manifoldTemp + "°C";
+       }
  }
  if(parsedData.meta && parsedData.meta.manifoldMinTemp !== undefined){
        console.log("Min operating temperature:", parsedData.meta.manifoldMinTemp);
-       document.querySelector("#configModal .manifoldMinTemp").value = Number(parsedData.meta.manifoldMinTemp);
+       const minTempInput = document.querySelector("#configModal .manifoldMinTemp");
+       if (minTempInput) minTempInput.value = Number(parsedData.meta.manifoldMinTemp);
      
  
  }
@@ -2259,6 +2271,7 @@ function handleWebSocketMessage(data) {
 }
 
 let ws;
+let shouldReloadOnReconnect = false;
 const wsStatusElement = document.getElementById("ws-status");
 
 function setWsStatus(status) {
@@ -2291,6 +2304,10 @@ function connectWebSocket() {
  ws.onopen = function (event) {
    console.log("WebSocket connection opened:", event);
    setWsStatus("connected");
+   if (shouldReloadOnReconnect) {
+     window.location.reload();
+   }
+   shouldReloadOnReconnect = true;
    // Send a message to the server if needed
    // ws.send(JSON.stringify({ message: "Hello Server!" }));
  };
