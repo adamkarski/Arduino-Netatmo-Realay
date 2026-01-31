@@ -8,6 +8,7 @@
 #include <espnow.h>
 #include <ESP8266WebServer.h>
 #include <WebSocketsServer.h>
+#define IOTWEBCONF_CONFIG_USE_MDNS 0
 #include <IotWebConf.h>
 
 #ifndef IOTWEBCONF_ENABLE_JSON
@@ -542,8 +543,22 @@ void loop()
 
   iotWebConf.doLoop();
 
+  // Force restart after 5 minutes in AP mode if connection fails
+  static unsigned long apModeStartTime = 0;
+  
+  if (iotWebConf.getState() == 2) {
+    if (apModeStartTime == 0) apModeStartTime = millis();
+    if (millis() - apModeStartTime > 300000) { // 5 minutes
+      Serial.println("AP Mode timeout - Restarting...");
+      ESP.restart();
+    }
+  } else {
+    apModeStartTime = 0;
+  }
+
   // jeśli nawiązano połączenie z siecią
   if (iotWebConf.getState() == 4)
+  if (iotWebConf.getState() == iotwebconf::OnLine)
   {
 
     webSocket.loop();
