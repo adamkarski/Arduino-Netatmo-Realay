@@ -625,6 +625,20 @@ function handleWebSocketMessage(data) {
  const thermostatList = document.getElementById("thermostat-list");
  const loader = document.getElementById("loader");
 
+
+ if(parsedData.meta && parsedData.meta.ahtStatus !== undefined){
+  const consoleEl = document.querySelector(".console");
+  if(consoleEl) {
+      if (parsedData.meta.ahtStatus !== "OK") {
+          consoleEl.textContent = "AHT: " + parsedData.meta.ahtStatus;
+          consoleEl.style.color = "#ff4444";
+      } else {
+          // Opcjonalnie: wyczyść komunikat błędu, jeśli status wrócił do normy
+          // consoleEl.textContent = "";
+          consoleEl.style.color = ""; 
+      }
+  }
+}
  // Check for meta field first to update global state
   if (parsedData.meta && parsedData.meta.usegaz !== undefined) {
        window.useGazState = parsedData.meta.usegaz === "true";

@@ -14,7 +14,7 @@ output_file_path = os.path.join(current_directory, "include", "webPage.h")
 
 # NEW WERSION 
 css_files = ["app.css", "modal.css"]
-js_files = ["app.js"] 
+js_files = ["app.js", "weather.js", "qr_code.js"]  # Dodaj nazwy plików JS
 
 
 # Odczytaj zawartość pliku HTML
@@ -25,7 +25,7 @@ with open(input_file_path, "r") as input_file:
 
 # Zastąp linki do plików CSS ich zawartością
 for css_file in css_files:
-    css_file_path = os.path.join(current_directory, "include","src", "css", css_file)
+    css_file_path = os.path.join(current_directory, "include","src/css", css_file)
     with open(css_file_path, "r") as css_file_content:
         css_content = css_file_content.read()
 
@@ -34,12 +34,12 @@ for css_file in css_files:
 
 # Zastąp linki do plików JS ich zawartością
 for js_file in js_files:
-    js_file_path = os.path.join(current_directory, "include", "src", js_file)
+    js_file_path = os.path.join(current_directory, "include", "src/app", js_file)
     with open(js_file_path, "r") as js_file_content:
         js_content = js_file_content.read()
 
     # Zastąp link do pliku JS w pliku HTML zawartością JS
-    content = content.replace(f'<script type="text/javascript" src="src/{js_file}"></script>', f'<script type="text/javascript">{js_content}</script>')
+    content = content.replace(f'<script type="text/javascript" src="src/app/{js_file}"></script>', f'<script type="text/javascript">{js_content}</script>')
 
 
 

@@ -5,9 +5,10 @@ $(".qr-code").hide();
 
 
 
-
 function generateQR(user_input){
 
+  // Clear any existing QR code
+  qrcode_.innerHTML = "";
 
 var qrcode = new QRCode(qrcode_, {
     text: user_input,
@@ -19,7 +20,9 @@ var qrcode = new QRCode(qrcode_, {
 });
 
 
-
+// Make sure the QR code is visible
+$(".qr-code").show();
+/*
 let ipc = document.createElement("p");
 ipc.innerText = user_input;
 document.querySelector(".qr-code").appendChild(ipc);
@@ -30,11 +33,10 @@ close_qr.innerText = "+";
 close_qr.classList.add("qr-close", "ring-8", "ring-white", "ring-opacity-40");
 document.querySelector(".qr-code").appendChild(close_qr);
 
+
 $("a.a_qrcode, .qr-code .qr-close").on("click", function(){
   $(".qr-code").toggle(400);
 });
-
-
+ */
 
 }
-

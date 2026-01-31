@@ -271,6 +271,7 @@ public:
         meta["manifoldTemp"] = docPins["manifoldTemp"];
         meta["boostEnabled"] = docPins["boostEnabled"];
         meta["usegaz"] = docPins["usegaz"];
+        meta["ahtStatus"] = docPins["ahtStatus"];
         // Upewnij się, że inne potrzebne wartości (np. boostThreshold) są również dodawane do docPins lub przekazywane tutaj.
 
         String jsonString;
@@ -385,7 +386,7 @@ public:
             WiFiClient client;
 
             HTTPClient http;
-            http.setTimeout(2500); // Zmniejszono timeout do 2.5s (bezpieczne dla WDT)
+            http.setTimeout(10000); // Zwiększono timeout do 10s
             http.begin(client, url);
             int httpCode = http.GET();
 
@@ -393,12 +394,9 @@ public:
 
             if (httpCode > 0)
             {
-                // OPTYMALIZACJA: Zamiast pobierać cały String (payload), parsujemy strumieniowo.
-                // To oszczędza mnóstwo pamięci RAM i zapobiega fragmentacji.
-                DynamicJsonDocument doc(5120); // Zmniejszono do 5KB dla bezpieczeństwa pamięci
-                
-                // Używamy http.getStream() zamiast http.getString()
-                DeserializationError error = deserializeJson(doc, http.getStream());
+                String payload = http.getString();
+                DynamicJsonDocument doc(5120);
+                DeserializationError error = deserializeJson(doc, payload);
 
                 if (error) {
                     Serial.print(F("Błąd podczas parsowania JSON z API Netatmo: "));
@@ -433,7 +431,7 @@ public:
                         // Preserve existing forced status and fireplace target
                         bool forced = false;
                         float targetTemperatureFireplace = 0.0; // Default if room doesn't exist yet
-                        int8_t existingPinNumber = 0;           // Default pin
+                        int8_t existingPinNumber = -1;           // Default pin (indicates not found)
 
                         // Sprawdź, czy pokój już istnieje w naszej kolekcji
                         for (const auto &existingRoom : this->rooms)
@@ -447,18 +445,25 @@ public:
                             }
                         }
 
-                        const char* battery_state = room["battery_state"].as<const char *>();
+                        const char* battery_state_ptr = room["battery_state"].as<const char *>();
+                        const char* battery_state = battery_state_ptr ? battery_state_ptr : "";
+
                         uint16_t battery_level = room["battery_level"].as<uint16_t>();
                         uint8_t rf_strength = room["rf_strength"].as<uint8_t>();
                         const char* type = room["type"].as<const char *>();
                         bool reachable = room["reachable"].as<bool>();
-                        const char* anticipating = room["anticipating"].as<const char *>();
+                        const char* anticipating_ptr = room["anticipating"].as<const char *>();
+                        const char* anticipating = anticipating_ptr ? anticipating_ptr : "";
                         // Priority calculation is done in updateRoomParams
 
                         // Determine pin number: use existing if available, otherwise map from ID
-                        int8_t pinNumber = (existingPinNumber != 0) ? existingPinNumber : (int8_t)this->idToPinMap[id];
-                        if (pinNumber == 0 && existingPinNumber == 0)
-                        { // Check if ID was not in map initially
+                        int8_t pinNumber;
+                        if (existingPinNumber != -1) {
+                            pinNumber = existingPinNumber;
+                        } else if (this->idToPinMap.count(id)) {
+                            pinNumber = (int8_t)this->idToPinMap[id];
+                        } else {
+                            pinNumber = 0;
                             Serial.printf("Warning: No pin mapping found for new room ID %d. Defaulting to 0.\n", id);
                         }
 

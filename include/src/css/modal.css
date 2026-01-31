@@ -22,12 +22,7 @@
   max-width: 500px;
 } */
 
-#roomList div {
-  margin: 10px 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+
 
 /* Style dla zakładek */
 .config-tabs {
@@ -56,30 +51,8 @@
 }
 
 /* Style dla edycji pokoi */
-#roomList .room-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-  padding: 10px;
-  border-radius: 8px;
-  background-color: #f9f9f9;
-}
 
-#roomList .room-item input[type="text"] {
-  padding: 5px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  margin-right: 10px;
-  width: 40%;
-}
 
-#roomList .room-item select {
-  padding: 5px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  width: 30%;
-}
 
 .modal-content {
     -webkit-box-shadow: 0px 0px 73px 15px rgba(66, 68, 90, 0.44);

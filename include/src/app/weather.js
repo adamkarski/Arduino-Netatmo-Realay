@@ -56,19 +56,20 @@ function getForecast() {
       // console.log(data_.current.temp);
       if (data_.current.temp == '-0') { data_.current.temp = 0 }
       //data = data_;
-      srcOfImage = "//openweathermap.org/img/wn/" + data_.current.weather[0].icon + "@2x.png";
-      document.querySelector('.ifdata').classList.toggle('active');
-      $("footer .a_weather").append(`<img  src="//${srcOfImage}" alt=""/>`)
-      $("footer .a_weather").show();
+      srcOfImage = "https://openweathermap.org/img/wn/" + data_.current.weather[0].icon + "@2x.png";
+    /*   document.querySelector('.ifdata').classList.toggle('active'); */
+      $("footer .a_weather").append(`<img  src="${srcOfImage}" alt=""/>`)
+      $("footer .a_weather, .modal-back").show();
       $('.container-modal').hide();
-      $('.weather_widget .close, footer .a_weather').bind('click', function () {
+      $('.weather_widget .close, footer .a_weather,  .modal-back').bind('click', function () {
         $('.container-modal').toggle(300);
       });
 
       currentHour(data_);
       nextHours(data_['hourly']).then(() => {
 
-        const swiper = new Swiper('.swiper', {
+
+          const swiper = new Swiper('.swiper', {
           grabCursor: true,
           watchSlidesProgress: true,
           slidesPerView: 3,
@@ -79,7 +80,7 @@ function getForecast() {
 
         });
 
-      }).then(
+      }).then( 
         nextDays(data_['daily'])
       );
     });
@@ -99,7 +100,7 @@ let nextHours = async (data) => {
       let el = `<div class="swiper-slide flex time_items flex-col items-center noSelect" style="margin-right:30px; padding-bottom: 20px;">
                 <span class="font-semibold mt-1 text-sm lcd noSelect time_dis">${convertTimestamp(nexthour.dt, "hours")}:${convertTimestamp(nexthour.dt, "minutes")} </span>
                 <span class="text-xs font-semibold text-gray-400 lcd noSelect AMPM">PM</span>       
-                <img alt="" src="////openweathermap.org/img/wn/${nexthour.weather[0].icon}@2x.png" width="120px" class="noSelect" style="pointer-events: none;"/>	 
+                <img alt="" src="https://openweathermap.org/img/wn/${nexthour.weather[0].icon}@2x.png" width="120px" class="noSelect" style="pointer-events: none;"/>	 
                 <span class="font-semibold text-lg lcd noSelect">${nexthour.temp.toFixed(1)}°C</span>      <span class="text-sm lcd noSelect">${nexthour.feels_like}</span></div>`;
       html = html + el;
     });
@@ -112,7 +113,7 @@ let currentHour = async (data) => {
   let html = "";
   if (data) {
 
-    console.log(data);
+  /*   console.log(data); */
 
     html = `<div class="flex flex-col">
             <span class="text-3xl font-bold lcd">${data.current.temp}<span class="text-3xl oc">°C</span></span>
@@ -120,13 +121,13 @@ let currentHour = async (data) => {
             <!-- <span class="font-semibold mt-1 text-gray-500">${data.name}</span> -->
             </div>
             <div class="flex flex-col">
-            <span class="text-3xl font-bold lcd">&nbsp${data.current.humidity.toFixed(0)}<span class="text-3xl"><span
-              class="upperTop">o</span>/o</span></span>
+            <span class="text-3xl font-bold lcd">&nbsp${data.current.humidity.toFixed(0)}<span class="text-3xl percent"><span
+              class="upperTop ">o</span>/o</span></span>
 
             <!-- <span class="font-semibold mt-1 text-gray-500">${data.name}</span> -->
             </div>
             <div class="h-24 w-24 ">
-            <img  src="//${srcOfImage}" alt="" class="currentWeatherIcon"/>
+            <img  src="${srcOfImage}" alt="" class="currentWeatherIcon"/>
             </div>`;
     $('.currentHour').html("").append(html);
     return true;
@@ -145,13 +146,13 @@ let nextDays = async (data) => {
               ${dayjs.unix(day.dt).format('dddd')}<br>
               ${dayjs.unix(day.dt).locale('pl').format('D')} ${dayjs.unix(day.dt).format('MMM')}
               </span>
-            <div class="flex items-center justify-end w-1/4 pr-10">
+              <div class="flex items-center justify-end w-1/4 pr-10">
                 <span class="font-semibold humidityForecast">
                 ${day.humidity}%
                 </span>
             <IconHumidity></IconHumidity>
             </div>
-              <img alt="" src="////openweathermap.org/img/wn/${day.weather[0].icon}@2x.png" width="" />	
+              <img alt="" src="https://openweathermap.org/img/wn/${day.weather[0].icon}@2x.png" width="" />	
               <span class="font-semibold text-lg w-1/4 text-right temp_primary">${day.temp.day}°</span>
               <span class="under">
               <span class="fontTemp w-1/2 text-right temp_secondary"><span class="labelTemp">min
@@ -170,3 +171,94 @@ let nextDays = async (data) => {
 
 
 
+
+// nowa wersja 
+
+$(document).ready(function() {
+  // Helper function to init swiper safely
+  function initSwiper() {
+      const swiperEl = document.querySelector('.swiper');
+      if (swiperEl && swiperEl.swiper) {
+          swiperEl.swiper.destroy(true, true);
+      }
+
+     const swiper = new Swiper('.swiper', {
+          grabCursor: true,
+          watchSlidesProgress: true,
+          slidesPerView: 3,
+          autoplay: {
+            delay: 4500,
+           disableOnInteraction: true
+          },
+          observer: true,
+          observeParents: true
+      });
+      // tutaj ten element powinien miec fade in opacity wszystkie te elementy  .swiper-wrapper .swiper-slide
+      $('.swiper-wrapper .swiper-slide').animate({ opacity: 1 }, 500);
+  }
+
+  // Override getForecast to handle UI correctly and update footer
+  window.getForecast = function(showModal = false) {
+      // Use variables from weather.js
+      console.log("Rozpoczynam pobieranie pogody...");
+      const url = "https://api.openweathermap.org/data/3.0/onecall?lat=" + lat + "&lon=" + lon + "&appid=" + owapikey + "&units=metric";
+      console.log("URL zapytania:", url);
+
+      fetch(url)
+        .then((response) => response.json())
+        .then((data_) => {
+            console.log("Otrzymane dane pogodowe:", data_);
+            if (data_.current.temp == '-0') { data_.current.temp = 0 }
+
+            // Update Footer Temp
+            $(".a_weather .weather-temp").text(Math.round(data_.current.temp) + "°C");
+
+            // Update Footer Icon
+
+            const iconUrl = "https://openweathermap.org/img/wn/" + data_.current.weather[0].icon + "@2x.png";
+            $(".a_weather img").attr("src", iconUrl);
+
+            // Update global variable for weather.js functions (currentHour uses it)
+            srcOfImage = iconUrl;
+
+            // Populate Modal using weather.js functions
+            currentHour(data_);
+
+            // nextHours in weather.js creates .swiper-wrapper inside .nextHours
+            nextHours(data_['hourly']).then(() => {
+                const isVisible = $('.container-modal').is(':visible');
+
+                if (showModal) {
+                    // Show modal first, then init swiper in the callback to ensure dimensions are calculated correctly
+                    $('.container-modal').fadeIn(300);
+                    initSwiper();
+                } else if (isVisible) {
+                    // If updating in background while modal is open, re-init swiper
+                    initSwiper();
+                }
+            });
+
+            nextDays(data_['daily']);
+        })
+        .catch(err => {console.error("Weather fetch error:", err); });
+  };
+
+  // Bind click event
+  $('.a_weather').off('click').on('click', function(e) {
+      e.preventDefault();
+      getForecast(true);
+  });
+
+  // Close modal handlers
+  $(document).on('click', '.close, .modal-back', function() {
+      $('.container-modal').fadeOut(300);
+  });
+
+  // Load weather on start to show temp
+  getForecast(false);
+
+  // Auto-refresh weather every 30 minutes
+  setInterval(function() {
+      getForecast(false);
+  }, 30 * 60 * 1000);
+});
