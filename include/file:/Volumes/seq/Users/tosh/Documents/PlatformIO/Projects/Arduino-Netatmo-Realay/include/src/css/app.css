@@ -173,14 +173,18 @@ body.heating::before {
   left: 0px;
   opacity: 1;
   transition: all ease 1s;
-  background-image: -webkit-linear-gradient(
+  background-image: url("../../images/lato.jpg");
+  background-position: center;
+  background-size: cover;
+  backdrop-filter: brightness(10.5);
+  /* background-image: -webkit-linear-gradient(
     #fd8000,
     #fe8a00 20%,
     #fe9300 40%,
     #ff9c00 60%,
     orange 80%,
     #ffae00
-  );
+  ); */
   background-image: -moz-linear-gradient(
     #fd8000,
     #fe8a00 20%,
@@ -197,15 +201,15 @@ body.heating::before {
     orange 80%,
     #ffae00
   );
-  background-image: linear-gradient(
+  /* background-image: linear-gradient(
     #fd8000,
     #fe8a00 20%,
     #fe9300 40%,
     #ff9c00 60%,
     orange 80%,
     #ffae00
-  );
-  background-position: 106px;
+  ); */
+  /* background-position: 106px; */
 }
 
 body::before {
@@ -613,8 +617,8 @@ transition: all ease 1s;
     display: flex;
     border-radius: 0px 0px 20px 20px;
     margin-left: 10px;
-    background: #f5a402;
-    background: linear-gradient(180deg, rgba(245, 164, 2, 1) 0%, rgba(232, 155, 2, 1) 30%, rgba(156, 104, 0, 1) 100%);
+
+background: linear-gradient(180deg,rgba(171, 169, 169, 1) 1%, rgba(205, 205, 205, 1) 30%, rgba(150, 150, 150, 1) 100%);
     flex-direction: row;
     width: 42px;
     overflow: hidden;
@@ -662,7 +666,7 @@ footer button {
 }
 
 footer button:hover {
-  background-color: rgba(185, 66, 67, 1);
+  background-color: rgb(167 167 167 / 19%);
 }
 footer .right {
   display: flex;

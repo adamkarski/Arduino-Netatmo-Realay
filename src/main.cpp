@@ -8,7 +8,7 @@
 #include <espnow.h>
 #include <ESP8266WebServer.h>
 #include <WebSocketsServer.h>
-#define IOTWEBCONF_CONFIG_USE_MDNS 0
+// #define IOTWEBCONF_CONFIG_USE_MDNS 0
 #include <IotWebConf.h>
 
 #ifndef IOTWEBCONF_ENABLE_JSON
@@ -42,7 +42,7 @@ String forced;
 String woodStove;
 String state;
 String pin;
-bool useGaz_ = false; // use gas? button on webPage - Will be loaded from EEPROM
+bool useGaz_ = false;      // use gas? button on webPage - Will be loaded from EEPROM
 bool boostEnabled = false; // Czy włączać drugi pokój (Boost)?
 unsigned long lastSendTime = 0;
 unsigned long previousMillis = 0; // Variable to store the previous time
@@ -63,7 +63,8 @@ float manifoldMaxTemp = 60.0;
 
 void readAHT()
 {
-  if (!ahtFound) return;
+  if (!ahtFound)
+    return;
   aht.getEvent(&humidity, &temp);
   manifoldTemp = temp.temperature;
   manifoldHum = humidity.relative_humidity;
@@ -259,8 +260,8 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
       int id = docInput["id"];
 
       // Znajdz Room ktorego ID == id
-      RoomData* roomPtr = manager.getRoomByID(id);
-      
+      RoomData *roomPtr = manager.getRoomByID(id);
+
       if (roomPtr != nullptr)
       {
         int pinNumber = roomPtr->pinNumber;
@@ -269,10 +270,10 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
 
         // Update the forced status directly via pointer (no copy needed)
         roomPtr->forced = forced;
-        
-        // We can call updateOrAddRoom if we want to trigger specific update logic, 
+
+        // We can call updateOrAddRoom if we want to trigger specific update logic,
         // but direct modification is faster if we just want to save.
-        // manager.updateOrAddRoom(*roomPtr); 
+        // manager.updateOrAddRoom(*roomPtr);
 
         Serial.printf("Forced status for room %d set to %s\n", id, forced ? "true" : "false");
         saveSettings(manager, useGaz_, manifoldMinTemp, boostEnabled); // Save after change
@@ -379,12 +380,18 @@ void readInitWifiConfig()
   iwcWifi0["iwcWifiPassword"] = iwcWifiPassword;
   JsonObject documentRoot = doc.as<JsonObject>();
 
-  // Aplikujemy konfigurację
+  // Aplikujemy konfigurację, ale NIE zapisujemy jej do EEPROM automatycznie,
+  // aby nie nadpisywać ustawień wprowadzonych przez użytkownika w panelu WWW.
   iotWebConf.getRootParameterGroup()->loadFromJson(documentRoot);
-  iotWebConf.saveConfig();
 }
 
 #include <manifoldLogicOld.h>
+
+void wifiConnected()
+{
+  Serial.println("WiFi connected! Starting OTA...");
+  otaStart();
+}
 
 void setup()
 {
@@ -400,7 +407,7 @@ void setup()
   // Zabezpieczenie przed zawieszeniem magistrali I2C (Watchdog dla I2C)
   // Jeśli urządzenie slave przytrzyma linię zegara dłużej, ESP nie zawiesi się na amen.
   Wire.begin();
-  Wire.setClockStretchLimit(1000); 
+  Wire.setClockStretchLimit(1000);
 
   // Inicjalizacja czujnika temperatury AHT10
   if (!aht.begin())
@@ -408,39 +415,37 @@ void setup()
     Serial.println("Failed to initialize AHT10. Continuing execution without sensor.");
     ahtFound = false;
     // while (1); // Płytka wejdzie w pętlę, co prawdopodobnie spowoduje restart przez watchdog.
-  } else {
+  }
+  else
+  {
     ahtFound = true;
-  } 
+  }
 
   // -- Initialize EEPROM --
-  EEPROM.begin(EEPROM_SIZE); // Use the requested size (512)
-  Serial.printf("EEPROM size requested: %d bytes\n", EEPROM_SIZE);
+  EEPROM.begin(EEPROM_SIZE); 
+  Serial.printf("EEPROM size: %d bytes\n", EEPROM_SIZE);
 
   // -- Load settings or initialize EEPROM --
   if (!loadSettings(manager, useGaz_, manifoldMinTemp, boostEnabled))
   {
-    // EEPROM not initialized or data corrupted, save defaults
     Serial.println("Initializing EEPROM with default settings...");
-    useGaz_ = false; // Default value
-    // Manager defaults (like initial pin map) are set in its constructor.
-    // We save the current state which includes these defaults.
+    useGaz_ = false;
     saveSettings(manager, useGaz_, manifoldMinTemp, boostEnabled);
   }
-  // Update docPins based on potentially loaded useGaz_ value AFTER loading attempt
-  docPins["usegaz"] = useGaz_ ? "true" : "false";
+  
+  // Włączenie auto-reconnect dla WiFi
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
 
   // -- Initializing the network configuration --
-  readInitWifiConfig(); // Reads default WiFi creds, might be overwritten by saved config
-  // Dodaj callback-i dla IotWebConf
-  /*  iotWebConf.setWifiConnectionCallback(&wifiConnected);
-   iotWebConf.setConfigSavedCallback(&configSaved); */
+  readInitWifiConfig(); 
 
+  iotWebConf.setWifiConnectionCallback(&wifiConnected);
   iotWebConf.setConfigPin(CONFIG_PIN);
   iotWebConf.setStatusPin(LED_BUILTIN);
 
-  delay(3000);
-
-  iotWebConf.setApTimeoutMs(600000); // Ustaw timeout AP na 10 minut (600000ms), potem restart
+  // Skrócenie timeoutu AP, aby szybciej próbował się łączyć ponownie po restarcie
+  iotWebConf.setApTimeoutMs(120000); // 2 minuty zamiast 10
   iotWebConf.init();
   // -- Set up required URL handlers on the web server.
   server.on("/", handleRoot);
@@ -487,23 +492,10 @@ void setup()
     Serial.println("error");
   }
 
-  otaStart();
   initInputExpander();
   blinkOutput(20);
 
-#if defined(ESP8266) || defined(ESP32)
-  int eepromSize = 512; // Change based on board
-  EEPROM.begin(eepromSize);
-#endif
-
-  Serial.println("EEPROM content:");
-  for (int i = 0; i < 64; i++)
-  {
-    Serial.print("Address ");
-    Serial.print(i);
-    Serial.print(": ");
-    Serial.println(EEPROM.read(i));
-  }
+  // Usunięto nadmiarowy blok EEPROM.begin(512), który nadpisywał poprawną inicjalizację.
 
   // Inicjalizacja timera
   timers.attach(0, 65000, fetchNetatmo);
@@ -545,26 +537,29 @@ void loop()
 
   // Force restart after 5 minutes in AP mode if connection fails
   static unsigned long apModeStartTime = 0;
-  
-  if (iotWebConf.getState() == 2) {
-    if (apModeStartTime == 0) apModeStartTime = millis();
-    if (millis() - apModeStartTime > 300000) { // 5 minutes
+
+  if (iotWebConf.getState() == iotwebconf::ApMode)
+  {
+    if (apModeStartTime == 0)
+      apModeStartTime = millis();
+    if (millis() - apModeStartTime > 300000)
+    { // 5 minutes
       Serial.println("AP Mode timeout - Restarting...");
       ESP.restart();
     }
-  } else {
+  }
+  else
+  {
     apModeStartTime = 0;
   }
 
-  // jeśli nawiązano połączenie z siecią
-  if (iotWebConf.getState() == 4)
+  // Jeśli nawiązano połączenie z siecią
   if (iotWebConf.getState() == iotwebconf::OnLine)
   {
-
-    webSocket.loop();
-    ArduinoOTA.handle();
+      webSocket.loop();
+      ArduinoOTA.handle();
   }
-  
+
   // Logika i timery powinny działać niezależnie od statusu WiFi (np. sterowanie piecem offline)
   timers.process();
 }

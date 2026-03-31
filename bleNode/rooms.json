@@ -1,0 +1,64 @@
+{
+    "rooms": [
+        {
+            "id": "1812451076",
+            "reachable": true,
+            "anticipating": true,
+            "open_window": null,
+            "therm_measured_temperature": 1.7,
+            "therm_setpoint_temperature": 19,
+            "therm_setpoint_mode": "schedule",
+            "name": "AE",
+            "type": "bedroom",
+            "battery_state": "high",
+            "battery_level": 3790,
+            "rf_strength": 48,
+            "firmware_revision": 79
+        },
+        {
+            "id": "206653929",
+            "reachable": true,
+            "anticipating": null,
+            "open_window": null,
+            "therm_measured_temperature": 16.5,
+            "therm_setpoint_temperature": 13,
+            "therm_setpoint_mode": "schedule",
+            "name": "Kuchnia",
+            "type": "kitchen",
+            "battery_state": "full",
+            "battery_level": 4223,
+            "rf_strength": 74,
+            "firmware_revision": 80
+        },
+        {
+            "id": "38038562",
+            "reachable": true,
+            "anticipating": null,
+            "open_window": null,
+            "therm_measured_temperature": 13.9,
+            "therm_setpoint_temperature": 12.5,
+            "therm_setpoint_mode": "manual",
+            "name": "Waleria",
+            "type": "custom",
+            "battery_state": "high",
+            "battery_level": 4091,
+            "rf_strength": 48,
+            "firmware_revision": 79
+        },
+        {
+            "id": "1868270675",
+            "reachable": true,
+            "anticipating": true,
+            "open_window": null,
+            "therm_measured_temperature": 11.3,
+            "therm_setpoint_temperature": 19,
+            "therm_setpoint_mode": "schedule",
+            "name": "Łazienka",
+            "type": "bathroom",
+            "battery_state": "high",
+            "battery_level": 4083,
+            "rf_strength": 62,
+            "firmware_revision": 80
+        }
+    ]
+}

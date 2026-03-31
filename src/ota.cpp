@@ -1,20 +1,14 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
+#include <ESP8266mDNS.h>
 
 void otaStart() {
-
-  ArduinoOTA.setHostname("netatmo_relay1");
+  // Nazwa hosta musi być spójna z platformio.ini (Netatmo_Relay.local)
+  ArduinoOTA.setHostname("Netatmo_Relay");
+  
   ArduinoOTA.onStart([]() {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH) {
-      type = "sketch";
-    } else { // U_FS
-      type = "filesystem";
-    }
-
-    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+    String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
     Serial.println("Start updating " + type);
-
   });
   ArduinoOTA.onEnd([]() {
     Serial.println("\nEnd");

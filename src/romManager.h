@@ -6,11 +6,12 @@
 #include "roomManager.h"
 
 // --- EEPROM Settings ---
-#define MAX_ROOMS_EEPROM 6
-const byte EEPROM_MAGIC_VALUE = 0xAC;
+#define MAX_ROOMS_EEPROM 10
+const byte EEPROM_MAGIC_VALUE = 0xAD; // Zmieniono magic value, aby wymusić re-inicjalizację po zmianie struktury
 
-// Define EEPROM Addresses
-const int ADDR_MAGIC = 0;
+// Define EEPROM Addresses - START AT 1024 to avoid IotWebConf collision
+const int ADDR_EEPROM_START = 1024;
+const int ADDR_MAGIC = ADDR_EEPROM_START;
 const int ADDR_USE_GAZ = ADDR_MAGIC + sizeof(byte);
 const int ADDR_MIN_OPERATING_TEMP = ADDR_USE_GAZ + sizeof(bool);
 const int ADDR_BOOST_ENABLED = ADDR_MIN_OPERATING_TEMP + sizeof(float);
@@ -18,11 +19,11 @@ const int ADDR_ROOM_COUNT = ADDR_BOOST_ENABLED + sizeof(bool);
 const int ADDR_ROOM_DATA_START = ADDR_ROOM_COUNT + sizeof(byte);
 
 const int ROOM_DATA_SIZE = sizeof(int) + sizeof(int8_t) + sizeof(bool) + sizeof(float);
-const int EEPROM_SIZE = ADDR_ROOM_DATA_START + (MAX_ROOMS_EEPROM * ROOM_DATA_SIZE);
+const int EEPROM_SIZE = 2048; // Zwiększono całkowity rozmiar EEPROM
 
 void saveSettings(const RoomManager &mgr, bool currentUseGaz, float manifoldMinTemp, bool boostEnabled) {
   Serial.println("Saving settings to EEPROM...");
-  EEPROM.begin(EEPROM_SIZE);
+  // Bufor jest już zainicjowany w setup()
 
   EEPROM.put(ADDR_MAGIC, EEPROM_MAGIC_VALUE);
   EEPROM.put(ADDR_USE_GAZ, currentUseGaz);
@@ -51,18 +52,17 @@ void saveSettings(const RoomManager &mgr, bool currentUseGaz, float manifoldMinT
   } else {
     Serial.println("Settings saved successfully");
   }
-  EEPROM.end();
+  // Nie używamy EEPROM.end(), aby nie zwalniać bufora współdzielonego z IotWebConf
 }
 
 bool loadSettings(RoomManager &mgr, bool &outUseGaz, float &outManifoldTemp, bool &outBoostEnabled) {
   Serial.println("Loading settings from EEPROM...");
-  EEPROM.begin(EEPROM_SIZE);
+  // Bufor jest już zainicjowany w setup()
 
   byte magic = 0;
   EEPROM.get(ADDR_MAGIC, magic);
   if (magic != EEPROM_MAGIC_VALUE) {
     Serial.println("No valid settings found in EEPROM");
-    EEPROM.end();
     return false;
   }
 
@@ -98,7 +98,6 @@ bool loadSettings(RoomManager &mgr, bool &outUseGaz, float &outManifoldTemp, boo
     mgr.updateOrAddRoom(room);
   }
 
-  EEPROM.end();
   return true;
 }
 
